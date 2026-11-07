@@ -1,0 +1,33 @@
+{
+  "name": "mib2c-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that lets Claude see and work the MIB2 Configurator web app open in your browser",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "mib2c-mcp": "dist/src/index.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepare": "tsc",
+    "test": "tsc && node --test dist/test/*.test.js",
+    "start": "node dist/src/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "ws": "^8.22.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/ws": "^8.18.2",
+    "typescript": "~5.9.3"
+  }
+}
