@@ -120,3 +120,7 @@ node dist/src/index.js --help
 
 To try it against a local copy of the app, run the app's dev server (`npm run dev`, http://localhost:3000 is
 allowed) and point Claude at `node /path/to/mib2c-mcp/dist/src/index.js`.
+
+## Licence
+
+MIT, Copyright (c) 2026 Tomas Slekys. See [LICENSE](LICENSE).
