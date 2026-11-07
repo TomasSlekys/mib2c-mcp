@@ -65,18 +65,23 @@ server; they could do no more than you can on your own computer anyway.
 | `get_state` | Skin, head unit, theme, page, mode, car, side, unsaved changes, undo state. |
 | `list_cars` | The cars a page has pictures for, with names where known. |
 | `navigate` | Page, car, side, View / Edit mode, theme, head unit UI, screen view. |
-| `screenshot` | The page's screen as PNG, at the screen's own resolution. |
+| `screenshot` | The page's screen as PNG at the screen's own resolution; `labels` names every point and touch area, `region` + `zoom` shows a part up close, `file` writes it to disk. |
 | `get_scene_data` | The zone file of the ambient light / climate / car status page: points, touch areas, names, images. |
-| `move_items`, `align_items`, `distribute_items` | Move points, touch areas or corners (each call is one undo step). |
+| `move_items`, `set_points`, `align_items`, `distribute_items` | Move or place points, touch areas or corners (each call is one undo step). |
+| `reset_items`, `revert_file` | Put items, or a whole file, back as saved (one undo step). |
+| `copy_points` | Copy positions to the other side (mirrored) or another car (scaled to its picture). |
 | `undo`, `redo` | Step back and forward through position edits, per data file. |
-| `get_preview`, `set_preview` | What the car reports in the preview (nothing is written). |
+| `get_parking_data`, `move_parking`, `set_parking_preview` | The parking layout file (sectors, pieces, positions) and its preview (obstacles, faults, guide lines…). |
+| `get_energy_data`, `move_energy`, `set_energy_preview` | The energy flow file (car, battery, engine, e-motor, tracks) and its situation. |
+| `get_preview`, `set_preview` | What the car reports on the interior pages (nothing is written). |
 | `find_vehicle_messages` | Search the unit's 453 vehicle messages. |
-| `list_images`, `get_image` | Find images by path and get one as PNG (as stored, or its replacement). |
-| `replace_image`, `revert_image` | Replace an image with a picture file from this computer; take it back. |
-| `save` | Save every change; you confirm in the app first. |
+| `list_images`, `get_image`, `export_image` | Find images by path; get one as PNG, or write it to a file to edit elsewhere. |
+| `replace_image`, `replace_images`, `revert_image` | Replace one image, or a folder of them matched by file name, from pictures on this computer; take one back. |
+| `get_changes`, `check_skin` | Everything save would write, before and after; a check of the edited zone files. |
+| `save` | Save every change; you confirm in the app first, unless you let Claude save without asking. |
 
-Not yet available through Claude: moving parking and energy flow positions, and those pages' situation controls
-(screenshots, images and undo work there).
+Everything Claude does shows up in the app's **Claude › Log**: each action with its time, a plain description, how
+it went, and on click what Claude asked for and got back.
 
 ## Options
 

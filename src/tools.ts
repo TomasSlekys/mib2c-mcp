@@ -1,8 +1,8 @@
 // The tools Claude sees. Each one (except status) runs as a command on the connected MIB2 Configurator page; the
 // page does the work with the app's own code, so its rules, undo history and save confirmation all apply.
 
-import { readFile, stat } from 'node:fs/promises';
-import { extname, resolve } from 'node:path';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
@@ -44,6 +44,31 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     bridge.listenError
       ? bridge.listenError
       : `The MIB2 Configurator page is not connected. Ask the user to open the app (${APP_URL}) in Chrome or Edge with their skins folder. The first time only, they click "Claude" in the app's top bar and allow the browser's prompt (local network access)${bridge.port === 47391 ? '' : `, and enter port ${bridge.port} there`}; after that the page connects by itself within a few seconds whenever this server runs.`;
+
+  const failed = (e: unknown) =>
+    e instanceof NotConnected ? failure([e.message, howToConnect()].filter(Boolean).join(' ')) : failure(e instanceof Error ? e.message : String(e));
+
+  /** Runs a page command and writes the picture it returns to `file` (a PNG); answers with the rest. */
+  const runToFile = async (method: string, params: Record<string, unknown>, file: string): Promise<CallToolResult> => {
+    const path = resolve(file.endsWith('.png') ? file : `${file}.png`);
+    try {
+      const { image, ...rest } = (await bridge.call(method, params, 60_000)) as { image: { data: string } };
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path, Buffer.from(image.data, 'base64'));
+      return text({ file: path, ...rest });
+    } catch (e) {
+      return failed(e);
+    }
+  };
+
+  /** A picture file from this computer, as the page's replace_image wants it. */
+  const readPicture = async (file: string) => {
+    const path = resolve(file);
+    if (!IMAGE_TYPES[extname(path).toLowerCase()]) throw new Error(`${path}: the file must be a .png, .jpg, .jpeg or .webp picture.`);
+    const info = await stat(path);
+    if (info.size > MAX_PICTURE) throw new Error(`${path} is over ${MAX_PICTURE / 1024 / 1024} MB.`);
+    return { data: (await readFile(path)).toString('base64'), fileName: basename(path), path };
+  };
 
   /** Runs a page command and turns what comes back (or the failure) into a tool result. */
   const run = async (method: string, params: Record<string, unknown> = {}, timeoutMs?: number): Promise<CallToolResult> => {
@@ -117,14 +142,27 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     {
       title: 'Screenshot',
       description:
-        "A picture of the page's screen as the app draws it (the head unit's screen, or the picture with its lights, vents, parts and zone outlines). Drag handles and labels drawn as HTML are not included.",
+        "A picture of the page's screen as the app draws it (the head unit's screen, or the picture with its lights, vents, parts and zone outlines). labels draws point ids and touch area outlines with their names (interior pages). region + zoom shows a part up close. pictureBox in the answer says where the picture sits in the screenshot (x, y, pixels per picture pixel). With file, the PNG is written there instead of shown.",
       inputSchema: {
         maxWidth: z.number().int().min(100).max(4096).optional().describe('Cap on the width in pixels (default: the screen or picture at its own resolution, at most 2560)'),
         overlays: z.boolean().optional().describe('Include SVG overlays such as zone outlines and screen controls (default true)'),
+        labels: z.boolean().optional().describe('Draw point ids (with their image boxes) and touch areas (outline, index, name) on the picture'),
+        region: z
+          .object({
+            x: z.number(),
+            y: z.number(),
+            width: z.number().positive(),
+            height: z.number().positive(),
+            in: z.enum(['picture', 'screen']).optional().describe('picture (default): picture pixels, as get_scene_data gives them; screen: pixels of the full screenshot'),
+          })
+          .optional()
+          .describe('Only this part'),
+        zoom: z.number().min(1).max(8).optional().describe('Enlarge pixel for pixel (with region: a close look)'),
+        file: z.string().optional().describe('Write the PNG to this path on this computer instead of returning it'),
       },
       annotations: { readOnlyHint: true },
     },
-    (a) => run('screenshot', a),
+    ({ file, ...a }) => (file ? runToFile('screenshot', a, file) : run('screenshot', a)),
   );
 
   server.registerTool(
@@ -174,6 +212,179 @@ export function registerTools(server: McpServer, bridge: Bridge) {
       inputSchema: { items, axis: z.enum(['x', 'y']) },
     },
     (a) => run('distribute_items', a),
+  );
+
+  const place = z
+    .union([
+      z.object({ point: z.number().int(), x: z.number().optional(), y: z.number().optional() }),
+      z.object({ zone: z.number().int(), corner: z.number().int().optional(), x: z.number().optional(), y: z.number().optional() }),
+    ])
+    .describe('{"point": id, "x", "y"} (its image top-left) or {"zone": index, "x", "y"} (bounding box top-left) or {"zone": index, "corner": n, "x", "y"}');
+
+  server.registerTool(
+    'set_points',
+    {
+      title: 'Place many items',
+      description: 'Puts many points, touch areas or corners at exact positions in one step (one undo step), on the interior page shown. Picture pixels; kept inside the picture.',
+      inputSchema: { items: z.array(place).min(1) },
+    },
+    (a) => run('set_points', a),
+  );
+
+  server.registerTool(
+    'reset_items',
+    {
+      title: 'Reset items',
+      description: 'Puts the given points or touch areas back where the saved file has them (one undo step). A corner puts its whole touch area back.',
+      inputSchema: { items },
+    },
+    (a) => run('reset_items', a),
+  );
+
+  server.registerTool(
+    'revert_file',
+    {
+      title: 'Revert a file',
+      description: "Puts a whole data file back as saved (one undo step, so undo brings the edits back): the zone file shown, or the file named (a path from get_state's unsaved files: .gca, carstatus.car, .ops, .efl).",
+      inputSchema: { file: z.string().optional() },
+    },
+    (a) => run('revert_file', a),
+  );
+
+  const carSide = z.object({ car: z.string().optional().describe('Car code (default: the car shown)'), side: z.enum(['LHD', 'RHD']).optional() }).optional();
+  server.registerTool(
+    'copy_points',
+    {
+      title: 'Copy points to another side or car',
+      description:
+        "Copies the interior page's point and touch area positions from one car / side to another, in one undo step in the target file: points by id, touch areas by order. Between driving sides they are mirrored (by default); to a picture of another size they are scaled (by default). Default: from the car and side shown, to the other side of the same car.",
+      inputSchema: {
+        from: carSide,
+        to: carSide,
+        mirror: z.boolean().optional(),
+        scale: z.boolean().optional(),
+        what: z.enum(['all', 'points', 'zones']).optional(),
+        points: z.array(z.number().int()).optional().describe('Only these point ids'),
+      },
+    },
+    (a) => run('copy_points', a, 60_000),
+  );
+
+  server.registerTool(
+    'get_changes',
+    {
+      title: 'Unsaved changes',
+      description: 'Everything that save would write: each replaced image (with the file it came from) and every moved point, touch area, parking or energy flow position, with its saved and new place.',
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_changes'),
+  );
+
+  server.registerTool(
+    'check_skin',
+    {
+      title: 'Check before saving',
+      description: "Checks the edited zone files (and the one shown): whether the head unit loads each file, and points or touch areas that reach outside their picture or are too small to press. Errors would break the screen on the unit; warnings are worth a look.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('check_skin', {}, 60_000),
+  );
+
+  server.registerTool(
+    'get_parking_data',
+    {
+      title: 'Parking file',
+      description:
+        "The parking page's layout file (config_mini.ops / config.ops) for the car shown: sectors with their bands, background pieces and car image positions (with saved places when moved), the sensors by group, and the preview. Open the parking page first.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_parking_data'),
+  );
+
+  server.registerTool(
+    'move_parking',
+    {
+      title: 'Move parking positions',
+      description: 'Moves parking sectors (all their bands), background pieces or car image positions by dx / dy (stored left-half pixels; the right half follows mirrored). One undo step. Unsaved until save.',
+      inputSchema: {
+        items: z.array(z.union([z.object({ sector: z.number().int() }), z.object({ piece: z.number().int() }), z.object({ position: z.number().int() })])).min(1),
+        dx: z.number().optional(),
+        dy: z.number().optional(),
+      },
+    },
+    (a) => run('move_parking', a),
+  );
+
+  server.registerTool(
+    'set_parking_preview',
+    {
+      title: 'Parking preview',
+      description: 'What the car reports on the parking page (nothing is written): layout, 360° side sensors, rear traffic alert, trailer, obstacles per sensor, faults per group, guide lines and steering, the area view side.',
+      inputSchema: {
+        layout: z.enum(['mini', 'full', 'rear', 'area']).optional().describe('mini: pop-up (with camera), full: full screen, rear: rear sensors only, area: area view'),
+        show360: z.boolean().optional(),
+        rta: z.boolean().optional().describe('Rear traffic alert fitted'),
+        trailer: z.boolean().optional(),
+        obstacles: z.array(z.object({ sensor: z.number().int().min(0).max(15), distance: z.number() })).optional().describe('Replaces the obstacles: per sensor (get_parking_data lists them by group) its distance in cm'),
+        faults: z.array(z.enum(['ok', 'error', 'unavailable'])).length(4).optional().describe('Front, left side, right side, rear'),
+        rtaAlert: z.array(z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(15)])).length(2).optional().describe('Left, right: 1 none, 2 low, 3 hard, 15 error'),
+        level: z.union([z.literal('auto'), z.literal(1), z.literal(2), z.literal(3)]).optional(),
+        keepGrey: z.boolean().optional(),
+        guides: z.enum(['off', 'forward', 'reverse']).optional(),
+        steer: z.number().min(-100).max(100).optional(),
+        activeSide: z.string().optional().describe('Area view: none or a side name'),
+        ground: z.boolean().optional(),
+        clear: z.boolean().optional().describe('Remove obstacles, faults and alerts first'),
+      },
+    },
+    (a) => run('set_parking_preview', a),
+  );
+
+  server.registerTool(
+    'get_energy_data',
+    {
+      title: 'Energy flow file',
+      description: "The energy flow page's file (config_BEV.efl / config_PHEV.efl) for the car shown: car picture, features (battery, engine, e-motor) and flows (tracks, masks, wheel rings) with names and saved places when moved, and the preview. Open the energy flow page first.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_energy_data'),
+  );
+
+  server.registerTool(
+    'move_energy',
+    {
+      title: 'Move energy flow positions',
+      description: 'Moves the car picture, features or flows of the energy flow file by dx / dy (one undo step). A track and its mask usually move together. Unsaved until save.',
+      inputSchema: {
+        items: z.array(z.union([z.object({ car: z.literal(true) }), z.object({ feature: z.number().int() }), z.object({ flow: z.number().int() })])).min(1),
+        dx: z.number().optional(),
+        dy: z.number().optional(),
+      },
+    },
+    (a) => run('move_energy', a),
+  );
+
+  server.registerTool(
+    'set_energy_preview',
+    {
+      title: 'Energy flow preview',
+      description: 'What the car reports on the energy flow page (nothing is written): kind (BEV / PHEV), situation, parts on or off, battery flow and charge, movement.',
+      inputSchema: {
+        kind: z.enum(['BEV', 'PHEV']).optional(),
+        situation: z.enum(['none', 'electric', 'engine', 'boost', 'recuperation', 'sailing']).optional(),
+        engine: z.boolean().optional(),
+        motor: z.boolean().optional(),
+        battery: z.boolean().optional(),
+        batteryFlow: z.enum(['off', 'pos', 'neg']).optional().describe('pos: out of the battery, neg: into it'),
+        charge: z.number().min(0).max(100).optional(),
+        moving: z.boolean().optional(),
+      },
+    },
+    (a) => run('set_energy_preview', a),
   );
 
   for (const dir of ['undo', 'redo'] as const) {
@@ -288,6 +499,68 @@ export function registerTools(server: McpServer, bridge: Bridge) {
   );
 
   server.registerTool(
+    'export_image',
+    {
+      title: 'Export image',
+      description:
+        'Writes one image of the skin to a PNG file on this computer (as stored, or its unsaved replacement): to edit it in another tool, then bring it back with replace_image.',
+      inputSchema: { ...imageRef, which: z.enum(['current', 'new']).optional(), file: z.string().describe('Where to write the PNG (folders are made)') },
+    },
+    ({ file, ...a }) => runToFile('get_image', a, file),
+  );
+
+  server.registerTool(
+    'replace_images',
+    {
+      title: 'Replace images',
+      description:
+        'Replaces several images at once from picture files on this computer, each matched by its file name to the image of that name whose path contains scope (such as "0204080200/GenericCarAdjuster/AmbianceLight/" or a car code). A file that matches no image, or several different ones, is skipped and listed; an image shared by several cars counts once. Unsaved until save.',
+      inputSchema: {
+        folder: z.string().optional().describe('Every .png / .jpg / .webp in this folder'),
+        files: z.array(z.string()).optional().describe('Or these files'),
+        scope: z.string().min(1).describe('Part of the image paths to look in (a car code, or a folder of it)'),
+        fit: z.enum(['exact', 'fit', 'fill', 'stretch']).optional(),
+      },
+    },
+    async ({ folder, files, scope, fit }) => {
+      try {
+        let list = files ?? [];
+        if (folder) list = [...list, ...(await readdir(resolve(folder))).filter((f) => IMAGE_TYPES[extname(f).toLowerCase()]).map((f) => join(resolve(folder), f))];
+        if (list.length === 0) return failure('No picture files: give "folder" or "files".');
+        const found = (await bridge.call('list_images', { query: scope, limit: 10_000 })) as { images: { index: number; paths: string[] }[] };
+        const part = scope.toLowerCase();
+        const replaced: { file: string; index: number; path: string }[] = [];
+        const skipped: { file: string; reason: string }[] = [];
+        for (const file of list) {
+          const name = basename(file).toLowerCase();
+          const hits = found.images
+            .map((img) => ({ index: img.index, path: img.paths.find((p) => p.toLowerCase().includes(part) && p.split('/').pop()!.toLowerCase() === name) }))
+            .filter((h): h is { index: number; path: string } => !!h.path);
+          if (hits.length === 0) {
+            skipped.push({ file, reason: `no image named ${basename(file)} with "${scope}" in its path` });
+            continue;
+          }
+          if (hits.length > 1) {
+            skipped.push({ file, reason: `several images match: ${hits.map((h) => h.path).join(', ')}; narrow the scope` });
+            continue;
+          }
+          try {
+            const pic = await readPicture(file);
+            await bridge.call('replace_image', { index: hits[0].index, data: pic.data, fileName: pic.fileName, fit }, 120_000);
+            replaced.push({ file, index: hits[0].index, path: hits[0].path });
+          } catch (e) {
+            if (e instanceof NotConnected) throw e;
+            skipped.push({ file, reason: e instanceof Error ? e.message : String(e) });
+          }
+        }
+        return text({ replaced, skipped, unsaved: replaced.length > 0 });
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  server.registerTool(
     'replace_image',
     {
       title: 'Replace image',
@@ -300,17 +573,13 @@ export function registerTools(server: McpServer, bridge: Bridge) {
       },
     },
     async ({ file, ...a }) => {
-      const path = resolve(file);
-      const type = IMAGE_TYPES[extname(path).toLowerCase()];
-      if (!type) return failure('The file must be a .png, .jpg, .jpeg or .webp picture.');
+      let pic: Awaited<ReturnType<typeof readPicture>>;
       try {
-        const info = await stat(path);
-        if (info.size > MAX_PICTURE) return failure(`${path} is over ${MAX_PICTURE / 1024 / 1024} MB.`);
-        const data = (await readFile(path)).toString('base64');
-        return run('replace_image', { ...a, data, fileName: path.split(/[\\/]/).pop() }, 120_000);
+        pic = await readPicture(file);
       } catch (e) {
-        return failure(`Couldn't read ${path}: ${e instanceof Error ? e.message : String(e)}`);
+        return failure(`Couldn't read ${file}: ${e instanceof Error ? e.message : String(e)}`);
       }
+      return run('replace_image', { ...a, data: pic.data, fileName: pic.fileName }, 120_000);
     },
   );
 
@@ -329,7 +598,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     {
       title: 'Save',
       description:
-        "Saves every unsaved change into the skin folder (or downloads the files where the browser can't write to it). The app first shows the user the list of changes and waits for them to confirm there, so this can take a while; it reports whether they saved or cancelled. A .backup of each file is kept before its first save.",
+        "Saves every unsaved change into the skin folder (or downloads the files where the browser can't write to it). Unless the user let Claude save without asking (in the app's Claude menu), the app first shows them the list of changes and waits for them to confirm, so this can take a while; it reports whether they saved or cancelled. A .backup of each file is kept before its first save. Run check_skin first.",
       inputSchema: {},
       annotations: { destructiveHint: true },
     },
@@ -340,6 +609,9 @@ export function registerTools(server: McpServer, bridge: Bridge) {
 export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app (${APP_URL}) open in the user's browser: a tool for VW MIB2 head unit skins (ambient light, climate, car status, parking, energy flow, tyre and traffic sign screens).
 - Call status first. If the page isn't connected, tell the user how to connect it (the status result says how).
 - The user must open their skins folder in the app themselves; the browser doesn't let anything else pick it.
-- get_state says what is shown; navigate changes it; screenshot shows it. On the ambient light, climate and car status pages, get_scene_data lists the zone file's points and touch areas, and move_items / align_items / distribute_items move them (undo / redo take a step back).
-- Preview settings (set_preview) only change what is drawn. Edits and replaced images stay unsaved until save, which asks the user to confirm in the app. Don't save unless the user asked for it.
+- get_state says what is shown; navigate changes it; screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).
+- Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
+- Images: list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), revert_image.
+- Preview settings (set_preview, set_parking_preview, set_energy_preview) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
+- The user sees everything you do in the app's Claude log.
 - Car names marked unconfirmed, and point or area names marked guessed, are the app's best guesses.`;
