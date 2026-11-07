@@ -1,4 +1,4 @@
-// The tools Claude sees. Each one (except status) runs as a command on the connected MIB2 Configurator page; the
+// The tools the AI assistant sees. Each one (except status) runs as a command on the connected MIB2 Configurator page; the
 // page does the work with the app's own code, so its rules, undo history and save confirmation all apply.
 
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
@@ -23,7 +23,7 @@ const imageRef = {
   path: z.string().optional().describe('Or a path from images.res, e.g. "0203070200/GenericCarAdjuster/AmbianceLight/Interior_LHD.png"'),
 };
 
-// Compact JSON: coordinate lists stay on one line (fewer tokens for Claude to read).
+// Compact JSON: coordinate lists stay on one line (fewer tokens for the assistant to read).
 const text = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }] });
 const failure = (message: string): CallToolResult => ({ isError: true, content: [{ type: 'text', text: message }] });
 
@@ -43,7 +43,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
   const howToConnect = () =>
     bridge.listenError
       ? bridge.listenError
-      : `The MIB2 Configurator page is not connected. Ask the user to open the app (${APP_URL}) in Chrome or Edge with their skins folder. The first time only, they click "Claude" in the app's top bar and allow the browser's prompt (local network access)${bridge.port === 47391 ? '' : `, and enter port ${bridge.port} there`}; after that the page connects by itself within a few seconds whenever this server runs.`;
+      : `The MIB2 Configurator page is not connected. Ask the user to open the app (${APP_URL}) in Chrome or Edge with their skins folder. The first time only, they click "MCP" in the app's top bar and allow the browser's prompt (local network access)${bridge.port === 47391 ? '' : `, and enter port ${bridge.port} there`}; after that the page connects by itself within a few seconds whenever this server runs.`;
 
   const failed = (e: unknown) =>
     e instanceof NotConnected ? failure([e.message, howToConnect()].filter(Boolean).join(' ')) : failure(e instanceof Error ? e.message : String(e));
@@ -598,7 +598,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     {
       title: 'Save',
       description:
-        "Saves every unsaved change into the skin folder (or downloads the files where the browser can't write to it). Unless the user let Claude save without asking (in the app's Claude menu), the app first shows them the list of changes and waits for them to confirm, so this can take a while; it reports whether they saved or cancelled. A .backup of each file is kept before its first save. Run check_skin first.",
+        "Saves every unsaved change into the skin folder (or downloads the files where the browser can't write to it). Unless the user let MCP save without asking (in the app's MCP menu), the app first shows them the list of changes and waits for them to confirm, so this can take a while; it reports whether they saved or cancelled. A .backup of each file is kept before its first save. Run check_skin first.",
       inputSchema: {},
       annotations: { destructiveHint: true },
     },
@@ -613,5 +613,5 @@ export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app ($
 - Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
 - Images: list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), revert_image.
 - Preview settings (set_preview, set_parking_preview, set_energy_preview) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
-- The user sees everything you do in the app's Claude log.
+- The user sees everything you do in the app's MCP log.
 - Car names marked unconfirmed, and point or area names marked guessed, are the app's best guesses.`;

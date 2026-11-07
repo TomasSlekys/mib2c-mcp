@@ -1,13 +1,13 @@
 # mib2c-mcp
 
-An MCP server that lets Claude see and work the [MIB2 Configurator](https://mib2c.pqisa.eu) open in your browser:
-the web app for VW MIB2 head unit skins (ambient light, climate, car status, parking, energy flow, tyre and traffic
-sign screens).
+An MCP server that lets an AI assistant (Claude, Codex, Cursor, VS Code Copilot or any other MCP app) see and work
+the [MIB2 Configurator](https://mib2c.pqisa.eu) open in your browser: the web app for VW MIB2 head unit skins (ambient
+light, climate, car status, parking, energy flow, tyre and traffic sign screens).
 
-Claude can read what the app shows, switch pages, cars, sides and themes, take screenshots of the head unit screen,
-read and move ambient light / climate / car status points and touch areas (with undo), set the preview situation
-(ambient colour, climate preset, vehicle messages, lights and vents on or off), and list, export and replace images.
-Saving goes through the app: it shows you the list of changes and waits for you to confirm.
+The assistant can read what the app shows, switch pages, cars, sides and themes, take screenshots of the head unit
+screen, move points, touch areas, parking and energy flow positions (with undo), set the preview situation, and
+export and replace images. Saving goes through the app: it shows you the list of changes and waits for you to
+confirm (unless you let it save without asking). Everything it does shows up in the app's **MCP › Log**.
 
 Your skin files stay in the browser. This server runs on your computer, listens only on `127.0.0.1`, and talks to
 the page over a WebSocket. There is nothing to pair or type in.
@@ -16,9 +16,11 @@ the page over a WebSocket. There is nothing to pair or type in.
 
 - Node.js 20 or newer, and git (npx fetches the server from GitHub).
 - Chrome or Edge with the app open (https://mib2c.pqisa.eu, or your own copy of it).
-- Claude Code, Claude Desktop, or another MCP client.
+- An AI app that uses MCP servers (examples below).
 
 ## Set up
+
+Add the server to your AI app once, then restart the app (or start a new session): it starts the server by itself.
 
 **Claude Code**
 
@@ -26,7 +28,20 @@ the page over a WebSocket. There is nothing to pair or type in.
 claude mcp add --scope user mib2c -- npx -y github:TomasSlekys/mib2c-mcp
 ```
 
-Start a new Claude Code session afterwards (a running one doesn't see a newly added server).
+**Codex CLI**
+
+```sh
+codex mcp add mib2c -- npx -y github:TomasSlekys/mib2c-mcp
+```
+
+Then give it more time in `~/.codex/config.toml` (the first start builds the server, and a save waits while you
+confirm it in the app; Codex's defaults are 10 and 60 seconds):
+
+```toml
+[mcp_servers.mib2c]
+startup_timeout_sec = 120
+tool_timeout_sec = 900
+```
 
 **Claude Desktop**: Settings › Developer › Edit Config, then add to `claude_desktop_config.json`:
 
@@ -38,19 +53,32 @@ Start a new Claude Code session afterwards (a running one doesn't see a newly ad
 }
 ```
 
-On Windows, if Claude Desktop can't start it, use `"command": "cmd", "args": ["/c", "npx", "-y", "github:TomasSlekys/mib2c-mcp"]`.
+**Cursor**: the same `mcpServers` block in `~/.cursor/mcp.json`.
+
+**VS Code** (GitHub Copilot, agent mode): in `.vscode/mcp.json` (or the user `mcp.json`):
+
+```json
+{
+  "servers": {
+    "mib2c": { "type": "stdio", "command": "npx", "args": ["-y", "github:TomasSlekys/mib2c-mcp"] }
+  }
+}
+```
+
+On Windows, if an app can't start `npx`, use `"command": "cmd", "args": ["/c", "npx", "-y", "github:TomasSlekys/mib2c-mcp"]`.
 
 ## Connect the page
 
-**The first time:** open the app, click **Claude** in its top bar, and click **Allow** when the browser asks whether
-the site may access your local network (or this computer). The dot turns green once Claude is running.
+**The first time:** open the app, click **MCP** in its top bar, and click **Allow** when the browser asks whether
+the site may access your local network (or this computer). The dot turns green once your AI app is running. The
+same menu shows the setup lines above.
 
-**After that:** nothing. The page connects by itself, within a few seconds, whenever Claude runs this server. Open
-the app and your skins folder and talk to Claude.
+**After that:** nothing. The page connects by itself, within a few seconds, whenever your AI app runs this server,
+and the MCP log opens at the bottom. Open the app and your skins folder and talk to your assistant.
 
 Why the one click: browsers only let a public website reach `127.0.0.1` after you allow it (Chrome's Local Network
-Access), and the app doesn't ask on its own, so visitors who don't use Claude never see the prompt. Chrome remembers
-your answer for the site. **Turn off** in the Claude menu stops the page connecting until you turn it on again. The
+Access), and the app doesn't ask on its own, so visitors who don't use MCP never see the prompt. Chrome remembers
+your answer for the site. **Turn off** in the MCP menu stops the page connecting until you turn it on again. The
 app run on your own computer (`localhost`) connects without the prompt.
 
 Security: the server only accepts the app's own pages (by their origin, which the browser sets and a web page can't
@@ -61,7 +89,7 @@ server; they could do no more than you can on your own computer anyway.
 
 | Tool | What it does |
 | --- | --- |
-| `status` | Connection state, and how to connect if the page isn't. Claude calls this first. |
+| `status` | Connection state, and how to connect if the page isn't. The assistant calls this first. |
 | `get_state` | Skin, head unit, theme, page, mode, car, side, unsaved changes, undo state. |
 | `list_cars` | The cars a page has pictures for, with names where known. |
 | `navigate` | Page, car, side, View / Edit mode, theme, head unit UI, screen view. |
@@ -78,10 +106,10 @@ server; they could do no more than you can on your own computer anyway.
 | `list_images`, `get_image`, `export_image` | Find images by path; get one as PNG, or write it to a file to edit elsewhere. |
 | `replace_image`, `replace_images`, `revert_image` | Replace one image, or a folder of them matched by file name, from pictures on this computer; take one back. |
 | `get_changes`, `check_skin` | Everything save would write, before and after; a check of the edited zone files. |
-| `save` | Save every change; you confirm in the app first, unless you let Claude save without asking. |
+| `save` | Save every change; you confirm in the app first, unless you let MCP save without asking. |
 
-Everything Claude does shows up in the app's **Claude › Log**: each action with its time, a plain description, how
-it went, and on click what Claude asked for and got back.
+Everything the assistant does shows up in the app's **MCP › Log**: each action with its time, a plain description,
+how it went, and on click what it asked for and got back.
 
 ## Options
 
@@ -91,18 +119,18 @@ mib2c-mcp [--port <n>]
 
 | Setting | Default | |
 | --- | --- | --- |
-| `--port` / `MIB2C_PORT` | `47391` | WebSocket port on 127.0.0.1. Enter the same port in the app's Claude menu. |
+| `--port` / `MIB2C_PORT` | `47391` | WebSocket port on 127.0.0.1. Enter the same port in the app's MCP menu. |
 | `MIB2C_ORIGINS` | | More page origins allowed to connect, comma-separated, `*` matches any part (e.g. `https://mib2c.example.home`). Always allowed: `https://mib2c.pqisa.eu`, `http://localhost:*`, `http://127.0.0.1:*`, `https://*.ddev.site`. |
 
 ## Troubleshooting
 
-- **The dot stays amber ("waiting")**: Claude isn't running, or its server uses another port. Ask Claude for
-  `status` (Claude starts the server when it starts), and check the port.
+- **The dot stays amber ("waiting")**: your AI app isn't running, or its server uses another port. Ask your
+  assistant for `status` (the app starts the server when it starts), and check the port.
 - **Red dot ("blocked by the browser")**: the local network prompt was blocked. Click the icon left of the address,
   allow Local network (or Loopback network) access for the site, and reload.
-- **"Port 47391 is taken"**: another Claude session already runs mib2c-mcp. Close it, or give this one another port
+- **"Port 47391 is taken"**: another AI app or session already runs mib2c-mcp. Close it, or give this one another port
   (`MIB2C_PORT`) and enter that port in the app.
-- **"Versions differ"**: update whichever is older: reload the app, or restart Claude so npx fetches the latest
+- **"Versions differ"**: update whichever is older: reload the app, or restart your AI app so npx fetches the latest
   server.
 - **A page on your own address is refused**: add its origin to `MIB2C_ORIGINS`.
 - **Only one tab at a time**: a newly connected tab takes over from the previous one.
@@ -110,7 +138,7 @@ mib2c-mcp [--port <n>]
 ## How it works
 
 ```
-Claude ──stdio (MCP)──> mib2c-mcp ──ws://127.0.0.1:47391──> the app's page (the browser)
+AI app ──stdio (MCP)──> mib2c-mcp ──ws://127.0.0.1:47391──> the app's page (the browser)
 ```
 
 The server turns each tool call into a command for the page (`src/protocol.ts`; the app has the same file in
@@ -131,7 +159,7 @@ node dist/src/index.js --help
 ```
 
 To try it against a local copy of the app, run the app's dev server (`npm run dev`, http://localhost:3000 is
-allowed) and point Claude at `node /path/to/mib2c-mcp/dist/src/index.js`.
+allowed) and point your AI app at `node /path/to/mib2c-mcp/dist/src/index.js`.
 
 ## Licence
 

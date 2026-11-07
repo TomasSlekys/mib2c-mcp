@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// mib2c-mcp: an MCP server (stdio) for Claude that drives the MIB2 Configurator web app open in the browser. The
-// page connects to it over a WebSocket on 127.0.0.1; Claude's tool calls run on that page.
+// mib2c-mcp: an MCP server (stdio) for AI assistants (Claude, Codex, Cursor, ...) that drives the MIB2 Configurator web app open in the browser. The
+// page connects to it over a WebSocket on 127.0.0.1; the assistant's tool calls run on that page.
 
 import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -11,7 +11,7 @@ import { INSTRUCTIONS, registerTools } from './tools.js';
 
 const { version } = createRequire(import.meta.url)('../../package.json') as { version: string };
 
-const HELP = `mib2c-mcp ${version}: lets Claude see and work the MIB2 Configurator page open in your browser.
+const HELP = `mib2c-mcp ${version}: lets an AI assistant see and work the MIB2 Configurator page open in your browser.
 
 Usage: mib2c-mcp [--port <n>]
 
@@ -22,7 +22,11 @@ Environment:
   MIB2C_ORIGINS     extra page origins allowed to connect, comma-separated ("*" matches any part),
                     e.g. https://mib2c.example.home (default: ${DEFAULT_ORIGINS.join(', ')})
 
-Add it to Claude Code:  claude mcp add --scope user mib2c -- npx -y github:TomasSlekys/mib2c-mcp`;
+Add it to Claude Code:  claude mcp add --scope user mib2c -- npx -y github:TomasSlekys/mib2c-mcp
+Add it to Codex CLI:    codex mcp add mib2c -- npx -y github:TomasSlekys/mib2c-mcp
+                        (and in ~/.codex/config.toml under [mcp_servers.mib2c]: startup_timeout_sec = 120,
+                        tool_timeout_sec = 900)
+Others: https://github.com/TomasSlekys/mib2c-mcp#set-up`;
 
 function parseArgs(argv: string[]) {
   const out = { port: Number(process.env.MIB2C_PORT) || DEFAULT_PORT, help: false };

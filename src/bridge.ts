@@ -80,7 +80,7 @@ export class Bridge {
       wss.on('error', (err: NodeJS.ErrnoException) => {
         this.listenError =
           err.code === 'EADDRINUSE'
-            ? `Port ${this.opts.port} is taken, most likely by another mib2c-mcp (another Claude session). Close that one, or start this one with MIB2C_PORT set to another port and enter that port in the app.`
+            ? `Port ${this.opts.port} is taken, most likely by another mib2c-mcp (another AI app or session). Close that one, or start this one with MIB2C_PORT set to another port and enter that port in the app.`
             : `Couldn't listen on port ${this.opts.port}: ${err.message}`;
         this.log(this.listenError);
         resolve();
@@ -118,7 +118,7 @@ export class Bridge {
           t: 'rejected',
           reason:
             msg.protocol > PROTOCOL_VERSION
-              ? 'This mib2c-mcp is older than the app: update it (npx fetches the latest when Claude restarts it).'
+              ? 'This mib2c-mcp is older than the app: update it (npx fetches the latest when your AI app restarts it).'
               : 'The app is older than this mib2c-mcp: reload the page.',
         });
         return socket.close(4003, 'Protocol');

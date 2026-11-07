@@ -1,6 +1,6 @@
 {
   "name": "mib2c-mcp",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "MCP server that lets Claude see and work the MIB2 Configurator web app open in your browser",
   "license": "MIT",
   "author": "Tomas Slekys",
