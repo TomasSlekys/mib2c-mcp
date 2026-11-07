@@ -10,7 +10,7 @@ read and move ambient light / climate / car status points and touch areas (with 
 Saving goes through the app: it shows you the list of changes and waits for you to confirm.
 
 Your skin files stay in the browser. This server runs on your computer, listens only on `127.0.0.1`, and talks to
-the page over a WebSocket after you pair it once with a code.
+the page over a WebSocket. There is nothing to pair or type in.
 
 ## Requirements
 
@@ -23,8 +23,10 @@ the page over a WebSocket after you pair it once with a code.
 **Claude Code**
 
 ```sh
-claude mcp add mib2c -- npx -y github:TomasSlekys/mib2c-mcp
+claude mcp add --scope user mib2c -- npx -y github:TomasSlekys/mib2c-mcp
 ```
+
+Start a new Claude Code session afterwards (a running one doesn't see a newly added server).
 
 **Claude Desktop**: Settings › Developer › Edit Config, then add to `claude_desktop_config.json`:
 
@@ -38,25 +40,28 @@ claude mcp add mib2c -- npx -y github:TomasSlekys/mib2c-mcp
 
 On Windows, if Claude Desktop can't start it, use `"command": "cmd", "args": ["/c", "npx", "-y", "github:TomasSlekys/mib2c-mcp"]`.
 
-## Pair the page (once)
+## Connect the page
 
-1. Open the app and your skins folder in it.
-2. Ask Claude for the MIB2 Configurator pairing code (its `status` tool shows it), or run
-   `npx -y github:TomasSlekys/mib2c-mcp --print-code`.
-3. In the app, click **Claude** in the top bar, enter the code and **Connect**. The dot turns green.
+**The first time:** open the app, click **Claude** in its top bar, and click **Allow** when the browser asks whether
+the site may access your local network (or this computer). The dot turns green once Claude is running.
 
-The page remembers the code and reconnects by itself whenever Claude starts the server again. The code is kept in
-`~/.config/mib2c-mcp/pairing.json` (Windows: `%APPDATA%\mib2c-mcp`). `--new-code` makes a new one; the page then
-has to be paired again.
+**After that:** nothing. The page connects by itself, within a few seconds, whenever Claude runs this server. Open
+the app and your skins folder and talk to Claude.
 
-Chrome may ask whether the site may access devices on your local network: allow it, as that is how the page reaches
-this server on your computer.
+Why the one click: browsers only let a public website reach `127.0.0.1` after you allow it (Chrome's Local Network
+Access), and the app doesn't ask on its own, so visitors who don't use Claude never see the prompt. Chrome remembers
+your answer for the site. **Turn off** in the Claude menu stops the page connecting until you turn it on again. The
+app run on your own computer (`localhost`) connects without the prompt.
+
+Security: the server only accepts the app's own pages (by their origin, which the browser sets and a web page can't
+fake), on `127.0.0.1` only. Programs already running on your computer could also connect, as with any local
+server; they could do no more than you can on your own computer anyway.
 
 ## Tools
 
 | Tool | What it does |
 | --- | --- |
-| `status` | Connection state and the pairing code. Claude calls this first. |
+| `status` | Connection state, and how to connect if the page isn't. Claude calls this first. |
 | `get_state` | Skin, head unit, theme, page, mode, car, side, unsaved changes, undo state. |
 | `list_cars` | The cars a page has pictures for, with names where known. |
 | `navigate` | Page, car, side, View / Edit mode, theme, head unit UI, screen view. |
@@ -76,22 +81,24 @@ Not yet available through Claude: moving parking and energy flow positions, and 
 ## Options
 
 ```
-mib2c-mcp [--port <n>] [--new-code] [--print-code]
+mib2c-mcp [--port <n>]
 ```
 
 | Setting | Default | |
 | --- | --- | --- |
-| `--port` / `MIB2C_PORT` | `47391` | WebSocket port on 127.0.0.1. Enter the same port in the app. |
+| `--port` / `MIB2C_PORT` | `47391` | WebSocket port on 127.0.0.1. Enter the same port in the app's Claude menu. |
 | `MIB2C_ORIGINS` | | More page origins allowed to connect, comma-separated, `*` matches any part (e.g. `https://mib2c.example.home`). Always allowed: `https://mib2c.pqisa.eu`, `http://localhost:*`, `http://127.0.0.1:*`, `https://*.ddev.site`. |
-| `MIB2C_CONFIG_DIR` | see above | Where the pairing code is kept. |
 
 ## Troubleshooting
 
-- **The dot stays amber ("waiting")**: the server isn't running or uses another port. Ask Claude for `status`
-  (Claude starts the server when it starts), and check the port.
+- **The dot stays amber ("waiting")**: Claude isn't running, or its server uses another port. Ask Claude for
+  `status` (Claude starts the server when it starts), and check the port.
+- **Red dot ("blocked by the browser")**: the local network prompt was blocked. Click the icon left of the address,
+  allow Local network (or Loopback network) access for the site, and reload.
 - **"Port 47391 is taken"**: another Claude session already runs mib2c-mcp. Close it, or give this one another port
   (`MIB2C_PORT`) and enter that port in the app.
-- **Red dot ("not paired")**: wrong code, or the code was renewed. Enter the code `status` shows.
+- **"Versions differ"**: update whichever is older: reload the app, or restart Claude so npx fetches the latest
+  server.
 - **A page on your own address is refused**: add its origin to `MIB2C_ORIGINS`.
 - **Only one tab at a time**: a newly connected tab takes over from the previous one.
 
@@ -106,7 +113,7 @@ The server turns each tool call into a command for the page (`src/protocol.ts`; 
 undo history and save confirmation apply, and sends back the result or a picture. The server only reads files
 from your computer for `replace_image`.
 
-The page must say hello with the pairing code within 5 seconds, from an allowed origin, or it is disconnected.
+The page must say hello within 5 seconds, from an allowed origin, or it is disconnected.
 Calls time out after 30 seconds (2 minutes for `replace_image`, 15 minutes for `save`, which waits for you).
 
 ## Development

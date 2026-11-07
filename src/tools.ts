@@ -43,7 +43,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
   const howToConnect = () =>
     bridge.listenError
       ? bridge.listenError
-      : `The MIB2 Configurator page is not connected. Ask the user to open the app (${APP_URL}) in Chrome or Edge, open their skins folder, click "Claude" in the top bar and enter the pairing code ${bridge.code}${bridge.port === 47391 ? '' : ` with port ${bridge.port}`}. The page remembers it and reconnects by itself after that.`;
+      : `The MIB2 Configurator page is not connected. Ask the user to open the app (${APP_URL}) in Chrome or Edge with their skins folder. The first time only, they click "Claude" in the app's top bar and allow the browser's prompt (local network access)${bridge.port === 47391 ? '' : `, and enter port ${bridge.port} there`}; after that the page connects by itself within a few seconds whenever this server runs.`;
 
   /** Runs a page command and turns what comes back (or the failure) into a tool result. */
   const run = async (method: string, params: Record<string, unknown> = {}, timeoutMs?: number): Promise<CallToolResult> => {
@@ -59,14 +59,14 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'status',
     {
       title: 'Connection status',
-      description: 'Whether the MIB2 Configurator page is connected, and the pairing code the user enters in the app (top bar › Claude) to connect it. Call this first.',
+      description: 'Whether the MIB2 Configurator page is connected, and how the user connects it if not. Call this first.',
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
     async () => {
       const page = bridge.connected;
-      if (!page) return text({ connected: false, pairingCode: bridge.code, port: bridge.port, app: APP_URL, howToConnect: howToConnect() });
-      return text({ connected: true, page: { app: page.version, origin: page.origin, since: page.since.toISOString() }, pairingCode: bridge.code, port: bridge.port });
+      if (!page) return text({ connected: false, port: bridge.port, app: APP_URL, howToConnect: howToConnect() });
+      return text({ connected: true, page: { app: page.version, origin: page.origin, since: page.since.toISOString() }, port: bridge.port });
     },
   );
 
@@ -338,7 +338,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
 }
 
 export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app (${APP_URL}) open in the user's browser: a tool for VW MIB2 head unit skins (ambient light, climate, car status, parking, energy flow, tyre and traffic sign screens).
-- Call status first. If the page isn't connected, tell the user how to connect it (the status result says how, with the pairing code).
+- Call status first. If the page isn't connected, tell the user how to connect it (the status result says how).
 - The user must open their skins folder in the app themselves; the browser doesn't let anything else pick it.
 - get_state says what is shown; navigate changes it; screenshot shows it. On the ambient light, climate and car status pages, get_scene_data lists the zone file's points and touch areas, and move_items / align_items / distribute_items move them (undo / redo take a step back).
 - Preview settings (set_preview) only change what is drawn. Edits and replaced images stay unsaved until save, which asks the user to confirm in the app. Don't save unless the user asked for it.

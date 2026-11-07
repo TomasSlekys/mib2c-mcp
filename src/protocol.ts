@@ -2,19 +2,19 @@
 // 127.0.0.1 and answers the tool calls. The same types live in the app (src/lib/bridge/protocol.ts in
 // pqisa-mib2-configurator-web); change both together and bump PROTOCOL_VERSION when a message changes shape.
 
-export const PROTOCOL_VERSION = 1;
+/** 2: no pairing code (the server trusts the page's origin, which the browser vouches for). */
+export const PROTOCOL_VERSION = 2;
 /** The server's default port (mib2c-mcp --port / MIB2C_PORT changes it). */
 export const DEFAULT_PORT = 47391;
 
-/** Page → server, first message: who is connecting, with the pairing code the server printed. */
+/** Page → server, first message: which app is connecting. */
 export interface Hello {
   t: 'hello';
   protocol: number;
-  code: string;
   app: { version: string; url: string };
 }
 
-/** Server → page: the pairing was accepted (or not, then the server closes the socket). */
+/** Server → page: the page was accepted (or not, then the server closes the socket). */
 export interface Welcome {
   t: 'welcome';
   server: { name: string; version: string };

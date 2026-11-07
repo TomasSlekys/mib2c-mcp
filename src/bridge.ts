@@ -1,15 +1,14 @@
-// The WebSocket end the MIB2 Configurator page connects to: on 127.0.0.1 only, from an allowed origin, and only
-// with the pairing code. One page at a time (a newer tab takes over). Tool calls go to that page and wait for its
-// answer.
+// The WebSocket end the MIB2 Configurator page connects to: on 127.0.0.1 only, and only from an allowed origin
+// (the browser sets Origin; a web page can't fake it). No pairing code: browsers also ask the user before a public
+// site may reach 127.0.0.1 at all. One page at a time (a newer tab takes over). Tool calls go to that page and wait
+// for its answer.
 
-import { timingSafeEqual } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { WebSocket, WebSocketServer } from 'ws';
 import { type Call, type Hello, PROTOCOL_VERSION, type Rejected, type Result, type Welcome } from './protocol.js';
 
 export interface BridgeOptions {
   port: number;
-  code: string;
   /** Origins allowed to connect: exact ("https://mib2c.pqisa.eu") or with "*" for any part ("http://localhost:*"). */
   origins: string[];
   server: { name: string; version: string };
@@ -37,12 +36,6 @@ export function originAllowed(origin: string | undefined, allowed: string[]): bo
   });
 }
 
-const sameCode = (a: string, b: string) => {
-  const x = Buffer.from(a.trim().toUpperCase());
-  const y = Buffer.from(b.trim().toUpperCase());
-  return x.length === y.length && timingSafeEqual(x, y);
-};
-
 export class Bridge {
   private wss: WebSocketServer | null = null;
   private page: WebSocket | null = null;
@@ -55,10 +48,6 @@ export class Bridge {
 
   constructor(private opts: BridgeOptions) {
     this.port = opts.port;
-  }
-
-  get code() {
-    return this.opts.code;
   }
 
   get connected(): PageInfo | null {
@@ -85,7 +74,7 @@ export class Bridge {
       wss.on('listening', () => {
         this.port = (wss.address() as AddressInfo).port;
         this.listenError = null;
-        this.log(`Waiting for the MIB2 Configurator page on ws://127.0.0.1:${this.port} (pairing code ${this.opts.code}).`);
+        this.log(`Waiting for the MIB2 Configurator page on ws://127.0.0.1:${this.port}.`);
         resolve();
       });
       wss.on('error', (err: NodeJS.ErrnoException) => {
@@ -123,7 +112,8 @@ export class Bridge {
         return;
       }
       if (msg.t !== 'hello') return socket.close(4002, 'Bad hello');
-      if (msg.protocol !== PROTOCOL_VERSION) {
+      // Protocol 1 (app 0.19.0) only added a pairing code, which is no longer checked.
+      if (msg.protocol !== PROTOCOL_VERSION && msg.protocol !== 1) {
         send({
           t: 'rejected',
           reason:
@@ -132,11 +122,6 @@ export class Bridge {
               : 'The app is older than this mib2c-mcp: reload the page.',
         });
         return socket.close(4003, 'Protocol');
-      }
-      if (typeof msg.code !== 'string' || !sameCode(msg.code, this.opts.code)) {
-        this.log(`Refused a page with a wrong pairing code (${origin}).`);
-        send({ t: 'rejected', reason: 'Wrong pairing code. Ask Claude for the code (its status tool shows it).' });
-        return socket.close(4004, 'Code');
       }
       // A newer tab takes over: the old one's calls fail and it hears why.
       if (this.page && this.page !== socket) {

@@ -1,23 +1,17 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { WebSocket } from 'ws';
 import { Bridge, NotConnected, originAllowed } from '../src/bridge.js';
-import { pairingCode } from '../src/pairing.js';
 import { PROTOCOL_VERSION } from '../src/protocol.js';
 
-const CODE = 'ABCD-2345';
-
 /** A page: connects, says hello and answers calls with `answer`. */
-function page(port: number, opts: { origin?: string; code?: string; protocol?: number; silent?: boolean; answer?: (m: { id: number; method: string; params: unknown }) => unknown } = {}) {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}`, { origin: opts.origin ?? 'https://mib2c.pqisa.eu' });
+function page(port: number, opts: { origin?: string; code?: string; noOrigin?: boolean; protocol?: number; silent?: boolean; answer?: (m: { id: number; method: string; params: unknown }) => unknown } = {}) {
+  const ws = new WebSocket(`ws://127.0.0.1:${port}`, opts.noOrigin ? {} : { origin: opts.origin ?? 'https://mib2c.pqisa.eu' });
   const messages: { t: string; reason?: string }[] = [];
   const closed = new Promise<number>((r) => ws.on('close', (code) => r(code)));
   const opened = new Promise<void>((resolve, reject) => {
     ws.on('open', () => {
-      ws.send(JSON.stringify({ t: 'hello', protocol: opts.protocol ?? PROTOCOL_VERSION, code: opts.code ?? CODE, app: { version: 'test', url: 'x' } }));
+      ws.send(JSON.stringify({ t: 'hello', protocol: opts.protocol ?? PROTOCOL_VERSION, ...(opts.code ? { code: opts.code } : {}), app: { version: 'test', url: 'x' } }));
       resolve();
     });
     ws.on('error', reject);
@@ -43,16 +37,16 @@ function page(port: number, opts: { origin?: string; code?: string; protocol?: n
 describe('Bridge', () => {
   let bridge: Bridge;
   before(async () => {
-    bridge = new Bridge({ port: 0, code: CODE, origins: ['https://mib2c.pqisa.eu', 'http://localhost:*'], server: { name: 'mib2c-mcp', version: 'test' } });
+    bridge = new Bridge({ port: 0, origins: ['https://mib2c.pqisa.eu', 'http://localhost:*'], server: { name: 'mib2c-mcp', version: 'test' } });
     await bridge.start();
   });
   after(() => bridge.stop());
 
-  it('says the page is not connected before one pairs', async () => {
+  it('says the page is not connected before one connects', async () => {
     await assert.rejects(bridge.call('get_state'), NotConnected);
   });
 
-  it('pairs a page and runs calls on it', async () => {
+  it('lets the app connect without a code and runs calls on it', async () => {
     const p = page(bridge.port, { answer: (m) => ({ method: m.method, params: m.params }) });
     await p.welcomed();
     assert.ok(bridge.connected);
@@ -61,17 +55,11 @@ describe('Bridge', () => {
     await p.closed;
   });
 
-  it('accepts the code in any case and with spaces', async () => {
-    const p = page(bridge.port, { code: ' abcd-2345 ' });
+  it('still lets in a 0.19.0 page (protocol 1, any pairing code)', async () => {
+    const p = page(bridge.port, { protocol: 1, code: 'OLD0-CODE' });
     await p.welcomed();
     p.ws.close();
     await p.closed;
-  });
-
-  it('refuses a wrong code', async () => {
-    const p = page(bridge.port, { code: 'WRONG-0000' });
-    assert.equal(await p.closed, 4004);
-    assert.equal(p.messages[0]?.t, 'rejected');
   });
 
   it('refuses another protocol version', async () => {
@@ -80,9 +68,9 @@ describe('Bridge', () => {
     assert.match(p.messages[0]?.reason ?? '', /older than the app/);
   });
 
-  it('refuses an origin that is not allowed', async () => {
-    const p = page(bridge.port, { origin: 'https://evil.example' });
-    await assert.rejects(p.opened);
+  it('refuses an origin that is not allowed, or none', async () => {
+    await assert.rejects(page(bridge.port, { origin: 'https://evil.example' }).opened);
+    await assert.rejects(page(bridge.port, { noOrigin: true }).opened);
   });
 
   it('lets a newer tab take over and fails the old tab\'s call', async () => {
@@ -117,16 +105,5 @@ describe('origins', () => {
     assert.ok(!originAllowed('https://evil.example/https://mib2c.pqisa.eu', allowed));
     assert.ok(!originAllowed('http://localhost.evil.example:80', allowed));
     assert.ok(!originAllowed(undefined, allowed));
-  });
-});
-
-describe('pairing code', () => {
-  it('is kept between runs until a new one is asked for', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mib2c-'));
-    const code = pairingCode(dir);
-    assert.match(code, /^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-    assert.equal(pairingCode(dir), code);
-    assert.equal(JSON.parse(readFileSync(join(dir, 'pairing.json'), 'utf8')).code, code);
-    assert.notEqual(pairingCode(dir, true), code);
   });
 });
