@@ -103,6 +103,8 @@ server; they could do no more than you can on your own computer anyway.
 | `get_energy_data`, `move_energy`, `set_energy_preview` | The energy flow file (car, battery, engine, e-motor, tracks) and its situation. |
 | `get_preview`, `set_preview` | What the car reports on the interior pages (nothing is written). |
 | `find_vehicle_messages` | Search the unit's 453 vehicle messages. |
+| `get_dev_info`, `list_screen_items`, `find_item_at`, `list_strings` | Firmware facts about the shown screen: view name, class, model name, view id, state machine states, button events and where they lead, datapool values; every drawn item (key, rect, image id → bitmap, string → text, font, colour); strings in other languages. Read-only. |
+| `find_view`, `find_string`, `find_image_usage` | Look up firmware views, strings and pictures across all the app's screens. Read-only. |
 | `list_images`, `get_image`, `export_image` | Find images by path; get one as PNG, or write it to a file to edit elsewhere. |
 | `replace_image`, `replace_images`, `revert_image` | Replace one image, or a folder of them matched by file name, from pictures on this computer; take one back. |
 | `get_changes`, `check_skin` | Everything save would write, before and after; a check of the edited zone files. |

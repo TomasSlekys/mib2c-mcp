@@ -593,6 +593,102 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     (a) => run('revert_image', a),
   );
 
+  // ---- Dev information (read-only): the firmware's names and numbers for what the screens draw. Works with the app's
+  // Dev view switch on or off; built from the app's build-time firmware data (MIB2 Standard debug jar).
+  const screenArg = z.string().optional().describe('Which shown screen (its name or view, e.g. "Offroad" or "Cmop"); default: the one shown');
+
+  server.registerTool(
+    'get_dev_info',
+    {
+      title: 'Dev info of the screen',
+      description:
+        "The firmware identity of the head unit screen shown now (Vehicle pages, ambient light, climate, car status, tyres, energy flow, parking): view name and class (generated/de/vw/mib/.../view/internal/<View>), ViewsTable model name, internal view id, the state machine states that show it (with their parent path), every event of its buttons (EID_..., id, the widget eventSender, the transitions they take and the view they lead to), the datapool values the screen reads where the app knows them (id, meaning, property name), the theme skin and the frame file.",
+      inputSchema: { screen: screenArg },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('get_dev_info', a),
+  );
+
+  server.registerTool(
+    'list_screen_items',
+    {
+      title: 'List screen items',
+      description:
+        "Everything the shown screen draws now, in drawing order (later is on top): widget key path, type (img, text, content area, page-drawn image, car picture), rect in screen pixels (800 x 480), view image id -> bitmap index in images.mcf (and the widget's image arrays + button state), string reference (i18n string id or string array + index) -> text in the UI language, font file + size, colour ('accent' = the unit's dynamic colour), alpha, the widget type and index, and the events a button sends. Filter matches any text in an item (key, text, ids).",
+      inputSchema: {
+        screen: screenArg,
+        filter: z.string().optional().describe('Only items whose description contains this (case-insensitive), e.g. "Button_Setup" or "1311"'),
+        type: z.enum(['img', 'text', 'content', 'image', 'car']).optional(),
+        limit: z.number().int().min(1).max(2000).optional().describe('Default 200'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('list_screen_items', a),
+  );
+
+  server.registerTool(
+    'find_item_at',
+    {
+      title: 'Find item at a point',
+      description: 'The items drawn at a point of the shown screen (screen pixels, 800 x 480 on MIB2 Standard), topmost first, described as in list_screen_items.',
+      inputSchema: { x: z.number(), y: z.number(), screen: screenArg },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('find_item_at', a),
+  );
+
+  server.registerTool(
+    'list_strings',
+    {
+      title: 'List screen strings',
+      description: 'Every string the shown screen shows: its reference (i18n string id, or string array + index; "runtime" for texts the car fills, shown as samples) -> text in the UI language, the widget key, and optionally the same strings in other languages of the theme skin.',
+      inputSchema: {
+        screen: screenArg,
+        languages: z.union([z.literal('all'), z.array(z.string())]).optional().describe('Other languages to add, e.g. ["de_DE", "fr_FR"], or "all"'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('list_strings', a),
+  );
+
+  server.registerTool(
+    'find_view',
+    {
+      title: 'Find firmware view',
+      description: 'Looks up the firmware views the app draws by view name (Cmop), ViewsTable model name (CAR_MAIN_OFFROAD_PQ), internal view id (36), class or state machine state (vCAR_TBT_TRIP2): class, model, view id, frame file, states.',
+      inputSchema: { query: z.union([z.string(), z.number()]) },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('find_view', a),
+  );
+
+  server.registerTool(
+    'find_string',
+    {
+      title: 'Find string usage',
+      description: 'Which screens and widgets use a string: by text (in the UI language, needs a theme skin open), by i18n string id, or by string array + index. Searches every MIB2 Standard frame the app has (not only the shown screen).',
+      inputSchema: {
+        text: z.string().optional(),
+        string: z.number().int().optional().describe('An i18n string id'),
+        array: z.number().int().optional().describe('A string array id'),
+        index: z.number().int().optional().describe('The index in the array (default 0)'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('find_string', a),
+  );
+
+  server.registerTool(
+    'find_image_usage',
+    {
+      title: 'Find image usage',
+      description: 'Which screens and widgets use a theme picture: by view image id, or by bitmap index in the theme skin\'s images.mcf (needs a theme skin open; also lists the view image ids drawn from that bitmap). Searches every MIB2 Standard frame the app has.',
+      inputSchema: { id: z.number().int().optional().describe('A view image id'), bitmap: z.number().int().optional().describe('An images.mcf index') },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('find_image_usage', a),
+  );
+
   server.registerTool(
     'save',
     {
@@ -613,5 +709,6 @@ export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app ($
 - Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
 - Images: list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), revert_image.
 - Preview settings (set_preview, set_parking_preview, set_energy_preview) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
+- Firmware / reverse engineering questions about a screen (read-only, with or without the app's Dev view switch): get_dev_info (view name, class, model name, view id, state machine states, button events and where they lead, datapool values read), list_screen_items, find_item_at (x, y on the screen), list_strings; across all screens: find_view, find_string, find_image_usage. Facts come from the MIB2 Standard firmware; runtime texts and content areas are the app's own and are marked so.
 - The user sees everything you do in the app's MCP log.
 - Car names marked unconfirmed, and point or area names marked guessed, are the app's best guesses.`;
