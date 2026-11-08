@@ -1,7 +1,7 @@
 # mib2c-mcp
 
 An MCP server that lets an AI assistant (Claude, Codex, Cursor, VS Code Copilot or any other MCP app) see and work
-the [MIB2 Configurator](https://mib2c.pqisa.eu) open in your browser: the web app for VW MIB2 head unit skins (ambient
+the [MIB2 Configurator](https://pqisa.eu/mib2c/) open in your browser: the web app for VW MIB2 head unit skins (ambient
 light, climate, car status, parking, energy flow, tyre and traffic sign screens).
 
 The assistant can read what the app shows, switch pages, cars, sides and themes, take screenshots of the head unit
@@ -15,7 +15,7 @@ the page over a WebSocket. There is nothing to pair or type in.
 ## Requirements
 
 - Node.js 20 or newer, and git (npx fetches the server from GitHub).
-- Chrome or Edge with the app open (https://mib2c.pqisa.eu, or your own copy of it).
+- Chrome or Edge with the app open (https://pqisa.eu/mib2c/, signed in with Discord, or your own copy of it).
 - An AI app that uses MCP servers (examples below).
 
 ## Set up
@@ -120,7 +120,7 @@ mib2c-mcp [--port <n>]
 | Setting | Default | |
 | --- | --- | --- |
 | `--port` / `MIB2C_PORT` | `47391` | WebSocket port on 127.0.0.1. Enter the same port in the app's MCP menu. |
-| `MIB2C_ORIGINS` | | More page origins allowed to connect, comma-separated, `*` matches any part (e.g. `https://mib2c.example.home`). Always allowed: `https://mib2c.pqisa.eu`, `http://localhost:*`, `http://127.0.0.1:*`, `https://*.ddev.site`. |
+| `MIB2C_ORIGINS` | | More page origins allowed to connect, comma-separated, `*` matches any part (e.g. `https://mib2c.example.home`). Always allowed: `https://pqisa.eu`, `https://mib2c.pqisa.eu` (the old address), `http://localhost:*`, `http://127.0.0.1:*`, `https://*.ddev.site`. |
 
 ## Troubleshooting
 

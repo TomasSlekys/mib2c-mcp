@@ -9,7 +9,7 @@ import { type Call, type Hello, PROTOCOL_VERSION, type Rejected, type Result, ty
 
 export interface BridgeOptions {
   port: number;
-  /** Origins allowed to connect: exact ("https://mib2c.pqisa.eu") or with "*" for any part ("http://localhost:*"). */
+  /** Origins allowed to connect: exact ("https://pqisa.eu") or with "*" for any part ("http://localhost:*"). */
   origins: string[];
   server: { name: string; version: string };
   log?: (line: string) => void;
@@ -25,7 +25,8 @@ export interface PageInfo {
 /** The page isn't connected, or went away during the call. */
 export class NotConnected extends Error {}
 
-export const DEFAULT_ORIGINS = ['https://mib2c.pqisa.eu', 'http://localhost:*', 'http://127.0.0.1:*', 'https://*.ddev.site'];
+// pqisa.eu serves the app at /mib2c/ (behind its Discord sign-in); mib2c.pqisa.eu is its old address.
+export const DEFAULT_ORIGINS = ['https://pqisa.eu', 'https://mib2c.pqisa.eu', 'http://localhost:*', 'http://127.0.0.1:*', 'https://*.ddev.site'];
 
 export function originAllowed(origin: string | undefined, allowed: string[]): boolean {
   if (!origin) return false;

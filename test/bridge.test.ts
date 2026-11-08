@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { WebSocket } from 'ws';
-import { Bridge, NotConnected, originAllowed } from '../src/bridge.js';
+import { Bridge, DEFAULT_ORIGINS, NotConnected, originAllowed } from '../src/bridge.js';
 import { PROTOCOL_VERSION } from '../src/protocol.js';
 
 /** A page: connects, says hello and answers calls with `answer`. */
@@ -99,6 +99,9 @@ describe('origins', () => {
   it('matches exact origins and wildcards', () => {
     const allowed = ['https://mib2c.pqisa.eu', 'http://localhost:*', 'https://*.ddev.site'];
     assert.ok(originAllowed('https://mib2c.pqisa.eu', allowed));
+    assert.ok(originAllowed('https://pqisa.eu', DEFAULT_ORIGINS));
+    assert.ok(!originAllowed('https://pqisa.eu.evil.example', DEFAULT_ORIGINS));
+    assert.ok(!originAllowed('https://evil.pqisa.eu', DEFAULT_ORIGINS));
     assert.ok(originAllowed('http://localhost:3000', allowed));
     assert.ok(originAllowed('https://mib2-configurator.ddev.site', allowed));
     assert.ok(!originAllowed('https://mib2c.pqisa.eu.evil.example', allowed));

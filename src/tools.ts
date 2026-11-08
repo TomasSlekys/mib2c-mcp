@@ -8,7 +8,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { type Bridge, NotConnected } from './bridge.js';
 
-export const APP_URL = 'https://mib2c.pqisa.eu';
+export const APP_URL = 'https://pqisa.eu/mib2c/';
 
 const page = z.enum(['ambient', 'climate', 'status', 'parking', 'energy', 'tyres', 'signs', 'images']);
 const item = z
