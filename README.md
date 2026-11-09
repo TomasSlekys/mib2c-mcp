@@ -107,6 +107,8 @@ server; they could do no more than you can on your own computer anyway.
 | `find_view`, `find_string`, `find_image_usage` | Look up firmware views, strings and pictures across all the app's screens. Read-only. |
 | `list_images`, `get_image`, `export_image` | Find images by path; get one as PNG, or write it to a file to edit elsewhere. |
 | `replace_image`, `replace_images`, `revert_image` | Replace one image, or a folder of them matched by file name, from pictures on this computer; take one back. |
+| `swap_images` | Two images trade pictures; on the page that draws them their places (zone file points, parking and energy flow positions) trade too, so the screen looks the same, unless `keepPlaces`. Unsaved until save. |
+| `swap_zones` | Two touch areas of the shown zone file trade outlines (places and shapes); each keeps its button id. One undo step. |
 | `get_changes`, `check_skin` | Everything save would write, before and after; a check of the edited zone files. |
 | `save` | Save every change; you confirm in the app first, unless you let MCP save without asking. |
 
@@ -149,7 +151,7 @@ undo history and save confirmation apply, and sends back the result or a picture
 from your computer for `replace_image`.
 
 The page must say hello within 5 seconds, from an allowed origin, or it is disconnected.
-Calls time out after 30 seconds (2 minutes for `replace_image`, 15 minutes for `save`, which waits for you).
+Calls time out after 30 seconds (2 minutes for `replace_image` and `swap_images`, 15 minutes for `save`, which waits for you).
 
 ## Development
 

@@ -593,6 +593,35 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     (a) => run('revert_image', a),
   );
 
+  server.registerTool(
+    'swap_images',
+    {
+      title: 'Swap two images',
+      description:
+        'Two images of the skin trade pictures (each gets the other\'s unsaved replacement if it has one, else its picture as stored), as unsaved replacements: unsaved until save; swapping them again, or revert_image, takes them back. By default their places trade too where the shown page stores them (ambient light / climate / car status zone file points, parking car and trailer positions, energy flow positions; one undo step), so the screen looks the same right after the swap and only which light or part owns which picture changes; keepPlaces: true trades only the pictures, so they appear in each other\'s spots. Images whose places the firmware fixes (or swapped from another page) only trade pictures. An image that must keep its size gets the other picture fitted into it. A shared image changes for every car using it, but the other cars\' places are not changed (the result notes this).',
+      inputSchema: {
+        a: z.union([z.number(), z.string()]).describe('The first image: its index, or a path from list_images'),
+        b: z.union([z.number(), z.string()]).describe('The second image: index or path'),
+        keepPlaces: z.boolean().optional().describe('true: only the pictures trade, the places stay (default false: places trade too)'),
+      },
+    },
+    (a) => run('swap_images', a, 120_000),
+  );
+
+  server.registerTool(
+    'swap_zones',
+    {
+      title: 'Swap two touch areas',
+      description:
+        "On the shown ambient light page (or any zone file with touch areas), two touch areas trade outlines: every corner, so their places and shapes swap while each keeps its button id (what the car maps to). Both need the same number of corners. One undo step; unsaved until save. Zone indexes as get_scene_data lists them.",
+      inputSchema: {
+        a: z.number().int().describe('The first touch area (zone index)'),
+        b: z.number().int().describe('The second touch area (zone index)'),
+      },
+    },
+    (a) => run('swap_zones', a),
+  );
+
   // ---- Dev information (read-only): the firmware's names and numbers for what the screens draw. Works with the app's
   // Dev view switch on or off; built from the app's build-time firmware data (MIB2 Standard debug jar).
   const screenArg = z.string().optional().describe('Which shown screen (its name or view, e.g. "Offroad" or "Cmop"); default: the one shown');
@@ -706,8 +735,8 @@ export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app ($
 - Call status first. If the page isn't connected, tell the user how to connect it (the status result says how).
 - The user must open their skins folder in the app themselves; the browser doesn't let anything else pick it.
 - get_state says what is shown; navigate changes it; screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).
-- Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
-- Images: list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), revert_image.
+- Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored), swap_zones (two touch areas trade outlines) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
+- Images: list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image.
 - Preview settings (set_preview, set_parking_preview, set_energy_preview) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
 - Firmware / reverse engineering questions about a screen (read-only, with or without the app's Dev view switch): get_dev_info (view name, class, model name, view id, state machine states, button events, the widgets that send them and where they lead, datapool values read), list_screen_items, find_item_at (x, y on the screen), list_strings; across all screens: find_view, find_string, find_image_usage. Facts come from the MIB2 Standard firmware; runtime texts and content areas are the app's own and are marked so.
 - The user sees everything you do in the app's MCP log.
