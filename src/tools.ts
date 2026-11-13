@@ -10,7 +10,7 @@ import { type Bridge, NotConnected } from './bridge.js';
 
 export const APP_URL = 'https://pqisa.eu/mib2c/';
 
-const page = z.enum(['ambient', 'climate', 'status', 'parking', 'energy', 'tyres', 'signs', 'images']);
+const page = z.enum(['ambient', 'climate', 'status', 'parking', 'energy', 'tyres', 'signs', 'vehicle', 'images']);
 const item = z
   .union([
     z.object({ point: z.number().int().describe('A feature / vent / part point by its id (get_scene_data lists them)') }),
@@ -19,9 +19,21 @@ const item = z
   .describe('{"point": id} or {"zone": index} or {"zone": index, "corner": n}');
 const items = z.array(item).min(1);
 const imageRef = {
-  index: z.number().int().optional().describe('The image index in images.mcf'),
+  index: z.number().int().optional().describe('The image index in images.mcf (with theme: the bitmap index in the theme skin\'s images.mcf)'),
   path: z.string().optional().describe('Or a path from images.res, e.g. "0203070200/GenericCarAdjuster/AmbianceLight/Interior_LHD.png"'),
+  theme: z.boolean().optional().describe('An image of the open theme skin (skin1…): the Vehicle screens\' dials, buttons, backgrounds and other UI pictures'),
+  viewImage: z.number().int().optional().describe('With theme: the view image id (list_screen_items, find_image_usage), instead of index'),
+  night: z.boolean().optional().describe('With viewImage: its night bitmap'),
 };
+const placement = z
+  .object({
+    scale: z.number().positive().max(50).optional().describe('Scale around the slot\'s centre, after fit'),
+    dx: z.number().optional().describe('Then move right by this many image pixels'),
+    dy: z.number().optional().describe('Then move down'),
+  })
+  .optional()
+  .describe('Place the picture by hand, as the replace window\'s zoom and drag (with fit "exact" it starts at actual size, centred)');
+const fit = z.enum(['exact', 'actual', 'fit', 'fill', 'stretch']);
 
 // Compact JSON: coordinate lists stay on one line (fewer tokens for the assistant to read).
 const text = (value: unknown): CallToolResult => ({ content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value) }] });
@@ -132,9 +144,62 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         theme: z.string().optional().describe('Theme skin name (skin1, skin2…) for the head unit UI, or "none"'),
         uiElements: z.boolean().optional().describe('Draw the head unit screen UI around the picture (needs a theme skin)'),
         frame: z.union([z.literal('whole'), z.literal('default'), z.number().int()]).optional().describe('Interior pages: the whole picture, the default screen view, or a view level'),
+        screen: z
+          .string()
+          .optional()
+          .describe(
+            "A screen by its id from get_state's screens (instead of page): Vehicle menu screens (status, tyres, perfmon, laptimer, energy, range, zeroemission, recuperation, offroad, offroad-setup, cockpit, cockpit-setup = Vehicle settings, eco, bc1-bc3, school, tbt-trip…), pureair, signs, upcoming:<key> (screens not built yet), progress",
+          ),
       },
     },
     (a) => run('navigate', a),
+  );
+
+  const control = {
+    id: z.string().optional().describe('The id from list_controls (stays while the control is shown)'),
+    label: z.string().optional().describe('Or its label (exact, else a unique part of it)'),
+    where: z.string().optional().describe('With label: only controls in this place (e.g. "unit screen", "Pages", a panel name)'),
+  };
+  server.registerTool(
+    'list_controls',
+    {
+      title: 'List controls',
+      description:
+        "Every control the user could use on the page now: the head unit screen's buttons and sliders (where \"unit screen\", box in screen pixels), the page menu, the side panels' settings (what the car reports, layers, status line…), open popups. Each has an id, role, label, where it is and its state (pressed, checked, current, value, min / max, options). Save buttons, confirmation dialogs, the MCP menu, sign-in and reports are left out.",
+      inputSchema: {
+        where: z.string().optional().describe('Only controls in this place, e.g. "unit screen" (the head unit screen)'),
+        query: z.string().optional().describe('Only controls whose label contains this'),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('list_controls', a),
+  );
+
+  server.registerTool(
+    'press',
+    {
+      title: 'Press a control',
+      description:
+        'Clicks a control as the user would: a screen button (opens sub-screens, pages, popups as on the unit), a menu entry, a radio or checkbox in a side panel. By id, by label, or at a point of the head unit screen. Returns what was pressed and the new state; take a screenshot to see it.',
+      inputSchema: {
+        ...control,
+        at: z.object({ x: z.number(), y: z.number() }).optional().describe('Or the screen control at this point (screen pixels, as screenshot and find_item_at use them)'),
+      },
+    },
+    (a) => run('press', a),
+  );
+
+  server.registerTool(
+    'set_control',
+    {
+      title: 'Set a control',
+      description: 'Sets a slider or number (stepped as with the arrow keys), a text field, a checkbox (true / false) or a list (an option by its text) to a value. Returns the control and the new state.',
+      inputSchema: {
+        ...control,
+        value: z.union([z.number(), z.string(), z.boolean()]),
+      },
+    },
+    (a) => run('set_control', a, 60_000),
   );
 
   server.registerTool(
@@ -422,7 +487,8 @@ export function registerTools(server: McpServer, bridge: Bridge) {
             colour: z.string().optional().describe('Any-colour cars: hex such as #ff8800'),
             model: z.enum(['rgb', 'f20']).optional().describe('rgb: any colour; f20: the six-colour list'),
             palette: z.number().int().min(0).max(6).optional().describe('f20 list entry, 0 = off'),
-            brightness: z.number().min(0).max(100).optional(),
+            brightness: z.number().min(0).max(100).optional().describe('Every area (clears per-area values)'),
+            areas: z.record(z.string(), z.number().min(0).max(100).nullable()).optional().describe('One area\'s brightness by feature id, e.g. {"5": 40}; null takes it back to the overall one'),
             mode: z.enum(['off', 'automatic', 'manual']).optional(),
             white: z.array(z.number().int()).optional().describe('Feature ids whose area is not in colour'),
           })
@@ -480,8 +546,15 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'list_images',
     {
       title: 'List images',
-      description: "Images in the skin's images.mcf whose path contains the query, with their index, every path that uses them (an image can be shared), and any unsaved replacement.",
-      inputSchema: { query: z.string().optional(), limit: z.number().int().min(1).max(1000).optional() },
+      description:
+        "Images in the skin's images.mcf whose path contains the query, with their index, every path that uses them (an image can be shared), and any unsaved replacement. With theme: the open theme skin's bitmaps by index (from, limit) with the view images drawn from each; replaced: only those with a replacement.",
+      inputSchema: {
+        query: z.string().optional(),
+        limit: z.number().int().min(0).max(10000).optional(),
+        theme: z.boolean().optional(),
+        from: z.number().int().min(0).optional().describe('With theme: the first bitmap index'),
+        replaced: z.boolean().optional().describe('With theme: only replaced bitmaps'),
+      },
       annotations: { readOnlyHint: true },
     },
     (a) => run('list_images', a),
@@ -519,7 +592,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         folder: z.string().optional().describe('Every .png / .jpg / .webp in this folder'),
         files: z.array(z.string()).optional().describe('Or these files'),
         scope: z.string().min(1).describe('Part of the image paths to look in (a car code, or a folder of it)'),
-        fit: z.enum(['exact', 'fit', 'fill', 'stretch']).optional(),
+        fit: fit.optional(),
       },
     },
     async ({ folder, files, scope, fit }) => {
@@ -569,7 +642,8 @@ export function registerTools(server: McpServer, bridge: Bridge) {
       inputSchema: {
         ...imageRef,
         file: z.string().describe('Path of the picture file on this computer'),
-        fit: z.enum(['exact', 'fit', 'fill', 'stretch']).optional().describe('exact (default): as it is; fit: whole picture inside; fill: cover, cropping; stretch: distort to the size'),
+        fit: fit.optional().describe('exact (default): as it is; actual: actual size, centred in the slot; fit: whole picture inside; fill: cover, cropping; stretch: distort to the size'),
+        placement,
       },
     },
     async ({ file, ...a }) => {
@@ -719,6 +793,147 @@ export function registerTools(server: McpServer, bridge: Bridge) {
   );
 
   server.registerTool(
+    'get_page_preview',
+    {
+      title: 'Page preview values',
+      description:
+        "The open Vehicle page's preview values (what the car reports): Tyres, Traffic signs, Sport, Car computer, Eco assist, Think Blue, E-traction, Offroad, Cockpit, Pure Air, Vehicle settings (also which settings sub-screen is open). Each field has its value, meaning, choices / keys / min / max, or readOnly. Interior pages use get_preview; parking and energy flow their own tools.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_page_preview'),
+  );
+
+  server.registerTool(
+    'set_page_preview',
+    {
+      title: 'Set page preview values',
+      description:
+        'Sets fields of the open page\'s preview (names and allowed values from get_page_preview): {"values": {"field": value, …}}; a record field takes only the keys to change. All are checked before any is set. Only the drawing changes; take a screenshot after.',
+      inputSchema: { values: z.record(z.string(), z.unknown()) },
+    },
+    (a) => run('set_page_preview', a),
+  );
+
+  server.registerTool(
+    'get_layers',
+    {
+      title: 'Layers',
+      description: "The page's layers as its Layers panel lists them (groups, each layer's id, name, whether it is shown and, in Edit mode, locked).",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_layers'),
+  );
+
+  server.registerTool(
+    'set_layers',
+    {
+      title: 'Show, hide or lock layers',
+      description: 'Shows or hides layers of the page (to look at one part alone in a screenshot), or locks / unlocks them in Edit mode. Only the view changes.',
+      inputSchema: {
+        show: z.array(z.string()).optional(),
+        hide: z.array(z.string()).optional(),
+        lock: z.array(z.string()).optional(),
+        unlock: z.array(z.string()).optional(),
+        showAll: z.boolean().optional(),
+      },
+    },
+    (a) => run('set_layers', a),
+  );
+
+  server.registerTool(
+    'get_screen',
+    {
+      title: 'Screen settings',
+      description: "How the app draws every screen: the theme's accent colour, Live (values moving as on a drive), the hand near the screen, Dev view, and on the car status page what the drawing rests on.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_screen'),
+  );
+
+  server.registerTool(
+    'set_screen',
+    {
+      title: 'Set screen settings',
+      description: 'Changes how the app draws the screens. Turn Live off for repeatable screenshots. Nothing is written to the skin.',
+      inputSchema: {
+        accent: z.string().optional().describe('The UI accent colour, hex such as #8c1eff (not for themes of a region with a fixed accent)'),
+        live: z.boolean().optional(),
+        handNear: z.boolean().optional().describe('The hand near the screen: the headline arrows\' boxes and the control bar labels'),
+        devView: z.boolean().optional().describe("The app's Dev view overlay (firmware names on the screen)"),
+        statusBase: z.enum(['auto', 'transp', 'car']).optional().describe('Car status: what the drawing rests on'),
+      },
+    },
+    (a) => run('set_screen', a),
+  );
+
+  server.registerTool(
+    'get_status_line',
+    {
+      title: 'Status line and car features',
+      description: "The status line every screen shows (clock, temperature, online, network, audio, phone…: the unit photo's set or set by hand), °F and 12 h, and the car features (parts only some cars show) with their choices.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
+    },
+    () => run('get_status_line'),
+  );
+
+  server.registerTool(
+    'set_status_line',
+    {
+      title: 'Set status line and car features',
+      description: 'Sets the status line (mode "custom" shows the parts in custom; give only the parts to change), °F, 12 h clock, and car features ({"id": choice index, or null for off}). Remembered in the browser like the user\'s own setting.',
+      inputSchema: {
+        mode: z.enum(['auto', 'custom']).optional(),
+        custom: z.record(z.string(), z.unknown()).optional().describe('Status line parts, as get_status_line lists them'),
+        fahrenheit: z.boolean().optional(),
+        hour12: z.boolean().optional(),
+        features: z.record(z.string(), z.number().int().min(0).nullable()).optional(),
+      },
+    },
+    (a) => run('set_status_line', a),
+  );
+
+  server.registerTool(
+    'list_presets',
+    {
+      title: 'List presets',
+      description: "Presets: changes other users published (images, positions) to try on. With check, how each fits the open skin. Also says which one is being tried on.",
+      inputSchema: { query: z.string().optional(), check: z.boolean().optional(), limit: z.number().int().min(0).max(200).optional() },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('list_presets', a, 120_000),
+  );
+
+  server.registerTool(
+    'try_preset',
+    {
+      title: 'Try on a preset',
+      description:
+        'try: applies a preset as unsaved changes (with the ones from before); before / after: shows the skin without or with it; keep: keeps its changes; discard: drops them. Publishing, editing or deleting presets is left to the user.',
+      inputSchema: { id: z.string().optional(), action: z.enum(['try', 'before', 'after', 'keep', 'discard']).optional() },
+    },
+    (a) => run('try_preset', a, 120_000),
+  );
+
+  server.registerTool(
+    'list_reports',
+    {
+      title: 'List reports',
+      description: 'Reports users left on the screens (what looks wrong, where, on which car and side), with replies. Read-only; answering them is left to the user.',
+      inputSchema: {
+        page: z.string().optional(),
+        view: z.string().optional().describe('A firmware view name'),
+        status: z.enum(['open', 'resolved', 'all']).optional(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (a) => run('list_reports', a),
+  );
+
+  server.registerTool(
     'save',
     {
       title: 'Save',
@@ -734,9 +949,9 @@ export function registerTools(server: McpServer, bridge: Bridge) {
 export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app (${APP_URL}) open in the user's browser: a tool for VW MIB2 head unit skins (ambient light, climate, car status, parking, energy flow, tyre and traffic sign screens).
 - Call status first. If the page isn't connected, tell the user how to connect it (the status result says how).
 - The user must open their skins folder in the app themselves; the browser doesn't let anything else pick it.
-- get_state says what is shown; navigate changes it; screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).
+- get_state says what is shown (page, screen, popups); navigate changes it (page, or any screen by id: Vehicle menu screens, settings, Pure Air, Soon screens); screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).\n- Vehicle pages' preview values: get_page_preview / set_page_preview. get_layers / set_layers show or hide parts. get_screen / set_screen (accent, Live off for repeatable screenshots, hand near, Dev view), get_status_line / set_status_line (status line, car features). Presets: list_presets, try_preset. Users' reports: list_reports.\n- To get anywhere else, or change a preview setting no tool covers, use the app's own controls: list_controls (screen buttons, menu, side panels, popups), press (by id, label, or screen point) and set_control (sliders, fields, lists).
 - Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored), swap_zones (two touch areas trade outlines) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
-- Images: list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image.
+- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image.
 - Preview settings (set_preview, set_parking_preview, set_energy_preview) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
 - Firmware / reverse engineering questions about a screen (read-only, with or without the app's Dev view switch): get_dev_info (view name, class, model name, view id, state machine states, button events, the widgets that send them and where they lead, datapool values read), list_screen_items, find_item_at (x, y on the screen), list_strings; across all screens: find_view, find_string, find_image_usage. Facts come from the MIB2 Standard firmware; runtime texts and content areas are the app's own and are marked so.
 - The user sees everything you do in the app's MCP log.
