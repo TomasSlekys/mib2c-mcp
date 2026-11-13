@@ -859,7 +859,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
       title: 'Set screen settings',
       description: 'Changes how the app draws the screens. Turn Live off for repeatable screenshots. Nothing is written to the skin.',
       inputSchema: {
-        accent: z.string().optional().describe('The UI accent colour, hex such as #8c1eff (not for themes of a region with a fixed accent)'),
+        accent: z.string().optional().describe('The UI accent colour, hex such as #8c1eff. It is the ambient light (Background lighting) colour, as on the unit: setting it sets that colour too (cars with a colour list: the nearest one). Not for themes of a region with a fixed accent'),
         live: z.boolean().optional(),
         handNear: z.boolean().optional().describe('The hand near the screen: the headline arrows\' boxes and the control bar labels'),
         devView: z.boolean().optional().describe("The app's Dev view overlay (firmware names on the screen)"),
