@@ -92,7 +92,7 @@ server; they could do no more than you can on your own computer anyway.
 | `status` | Connection state, and how to connect if the page isn't. The assistant calls this first. |
 | `get_state` | Skin, head unit, theme (and its look, e.g. VW Default), page, mode, car, side, unsaved changes, undo state. |
 | `list_cars` | The cars a page has pictures for, with names where known. |
-| `navigate` | Page or any screen (Vehicle menu screens, Vehicle settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), Set date, the driving profile pop-up and its settings, the control bar push-ups, Start-stop, the Menu (the MENU key's carousel or grid), Soon screens…), car, side, View / Edit mode, theme, head unit UI, screen view. |
+| `navigate` | Page or any screen (Vehicle menu screens, Vehicle settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), Set date, the driving profile pop-up and its settings, the control bar push-ups, Start-stop, the Menu (the MENU key's carousel or grid), Settings (the system setup's lists: `settings`, `settings:<screen>`), Soon screens…), car, side, View / Edit mode, theme, head unit UI, screen view. |
 | `list_controls`, `press`, `set_control` | The page's own controls: the head unit screen's buttons and sliders, the menu, the side panels, popups. List them (id, label, place, state), click one (by id, label or screen point), or set a slider, field or list. Save buttons, confirmations, the MCP menu, sign-in and reports are left out. |
 | `screenshot` | The page's screen as PNG at the screen's own resolution; `labels` names every point and touch area, `region` + `zoom` shows a part up close, `file` writes it to disk. |
 | `get_scene_data` | The zone file of the ambient light / climate / car status page: points, touch areas, names, images. |
@@ -101,14 +101,14 @@ server; they could do no more than you can on your own computer anyway.
 | `copy_points` | Copy positions to the other side (mirrored) or another car (scaled to its picture). |
 | `undo`, `redo` | Step back and forward through position edits, per data file. |
 | `get_parking_data`, `move_parking`, `set_parking_preview` | The parking layout file (sectors, pieces, positions) and its preview (obstacles, faults, guide lines…). |
-| `get_energy_data`, `move_energy`, `set_energy_preview` | The energy flow file (car, battery, engine, e-motor, tracks) and its situation. |
+| `get_energy_data`, `move_energy`, `set_energy_preview` | The energy flow file (car, battery, engine, e-motor, tracks) and its situation; the animations' phase and the screen's opening (play it, or hold one moment). |
 | `get_preview`, `set_preview` | What the car reports on the interior pages (nothing is written). |
 | `find_vehicle_messages` | Search the unit's 453 vehicle messages. |
 | `get_dev_info`, `list_screen_items`, `find_item_at`, `list_strings` | Firmware facts about the shown screen: view name, class, model name, view id, state machine states, button events and where they lead, datapool values; every drawn item (key, rect, image id → bitmap, string → text, font, colour); strings in other languages. Read-only. |
 | `find_view`, `find_string`, `find_image_usage` | Look up firmware views, strings and pictures across all the app's screens. Read-only. |
 | `list_images`, `get_image`, `export_image` | Find images by path; get one as PNG, or write it to a file to edit elsewhere. With `theme`, the open theme skin's bitmaps (the Vehicle screens' UI pictures), by index or view image id. |
 | `replace_image`, `replace_images`, `revert_image` | Replace one image (also a theme bitmap), or a folder of them matched by file name, from pictures on this computer; take one back. `fit` and `placement` (scale, dx, dy) place the picture as the replace window does. |
-| `get_page_preview`, `set_page_preview` | The open Vehicle page's preview values (tyres, traffic signs, Sport, car computer, Eco, Think Blue, E-traction, Offroad, Cockpit, Pure Air, Auxiliary heater, Set time, Driving profile (also the car's functions and options and the hybrid mode selection), the control bar push-ups, Start-stop, the Menu (which items show, the one in front), Vehicle settings). |
+| `get_page_preview`, `set_page_preview` | The open Vehicle page's preview values (tyres, traffic signs, Sport, car computer, Eco, Think Blue, E-traction, Offroad, Cockpit (also what each preset holds and the contents the car offers), Pure Air, Auxiliary heater, Set time, Driving profile (also the car's functions and options and the hybrid mode selection), the control bar push-ups, Start-stop, the Menu (which items show, the one in front), Settings (the screen, its list's rows, the system language the screens follow), Vehicle settings). |
 | `get_layers`, `set_layers` | The page's layers: show, hide, lock. |
 | `get_screen`, `set_screen` | Accent colour, Live, hand near the screen, Dev view, car status base. |
 | `get_status_line`, `set_status_line` | The status line on every screen, °F / 12 h, and the car features. |
