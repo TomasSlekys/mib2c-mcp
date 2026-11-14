@@ -92,7 +92,7 @@ server; they could do no more than you can on your own computer anyway.
 | `status` | Connection state, and how to connect if the page isn't. The assistant calls this first. |
 | `get_state` | Skin, head unit, theme, page, mode, car, side, unsaved changes, undo state. |
 | `list_cars` | The cars a page has pictures for, with names where known. |
-| `navigate` | Page or any screen (Vehicle menu screens, Vehicle settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), Soon screens…), car, side, View / Edit mode, theme, head unit UI, screen view. |
+| `navigate` | Page or any screen (Vehicle menu screens, Vehicle settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), Set date, Soon screens…), car, side, View / Edit mode, theme, head unit UI, screen view. |
 | `list_controls`, `press`, `set_control` | The page's own controls: the head unit screen's buttons and sliders, the menu, the side panels, popups. List them (id, label, place, state), click one (by id, label or screen point), or set a slider, field or list. Save buttons, confirmations, the MCP menu, sign-in and reports are left out. |
 | `screenshot` | The page's screen as PNG at the screen's own resolution; `labels` names every point and touch area, `region` + `zoom` shows a part up close, `file` writes it to disk. |
 | `get_scene_data` | The zone file of the ambient light / climate / car status page: points, touch areas, names, images. |

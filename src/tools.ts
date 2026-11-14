@@ -148,7 +148,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
           .string()
           .optional()
           .describe(
-            "A screen by its id from get_state's screens (instead of page): Vehicle menu screens (status, tyres, perfmon, laptimer, energy, range, zeroemission, recuperation, offroad, offroad-setup, cockpit, cockpit-setup = Vehicle settings, eco, bc1-bc3, school, tbt-trip…), pureair, parkheating (the auxiliary heater; parkheating:timers, parkheating:time1-3, parkheating:duration for its timer screens), sound, clock (Vehicle › Set time: Vehicle settings › Time and date › Time, the analogue clock), signs, upcoming:<key> (screens not built yet), progress",
+            "A screen by its id from get_state's screens (instead of page): Vehicle menu screens (status, tyres, perfmon, laptimer, energy, range, zeroemission, recuperation, offroad, offroad-setup, cockpit, cockpit-setup = Vehicle settings, eco, bc1-bc3, school, tbt-trip…), pureair, parkheating (the auxiliary heater; parkheating:timers, parkheating:time1-3, parkheating:duration for its timer screens), sound, clock (Vehicle › Set time: Vehicle settings › Time and date › Time, the analogue clock), date (Vehicle › Set date with the calendar), signs, upcoming:<key> (screens not built yet), progress",
           ),
       },
     },
@@ -797,7 +797,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     {
       title: 'Page preview values',
       description:
-        "The open Vehicle page's preview values (what the car reports): Tyres, Traffic signs, Sport, Car computer, Eco assist, Think Blue, E-traction, Offroad, Cockpit, Pure Air, Auxiliary heater, Set time (the unit clock every screen follows: time, running, time zone, summer time, time source, 12 / 24 hours), Vehicle settings (also which settings sub-screen is open). Each field has its value, meaning, choices / keys / min / max, or readOnly. Interior pages use get_preview; parking and energy flow their own tools.",
+        "The open Vehicle page's preview values (what the car reports): Tyres, Traffic signs, Sport, Car computer, Eco assist, Think Blue, E-traction, Offroad, Cockpit, Pure Air, Auxiliary heater, Set time (the unit clock every screen follows: time, running, time zone, summer time, time source, 12 / 24 hours), Set date (date, date format, the calendar), Vehicle settings (also which settings sub-screen is open). Each field has its value, meaning, choices / keys / min / max, or readOnly. Interior pages use get_preview; parking and energy flow their own tools.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
