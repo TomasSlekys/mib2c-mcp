@@ -521,6 +521,10 @@ export function registerTools(server: McpServer, bridge: Bridge) {
               .boolean()
               .optional()
               .describe('The car sends no style state: each zone\'s vents blue up to 22.0 °C (72 °F), red above (firmware), instead of air'),
+            open: z
+              .enum(['none', 'preset', 'profile', 'heater'])
+              .optional()
+              .describe('What is open over the screen (firmware views): the preset or fan profile drop-down (the screen\'s preset / fan buttons open them too; press an option to pick it), or the heater push-up (windscreen and steering wheel heating check boxes; the unit opens it from the bar\'s Heater button). get_preview also lists the bar functions that are on ("on").'),
             air: z.enum(['cold', 'neutral', 'warm']).optional().describe('The vents\' colour: cold = cooling (blue), neutral = venting (white), warm = heating (red)'),
             autoDistribution: z.boolean().optional().describe('Automatic air distribution: the vents in the paler colour of their pair'),
           })
