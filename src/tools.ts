@@ -514,8 +514,13 @@ export function registerTools(server: McpServer, bridge: Bridge) {
               .optional()
               .describe('auto: automatic air distribution, every front vent in the paler colour (firmware); defrost / maxac open the vents a car likely would (best guess)'),
             profile: z.enum(['soft', 'medium', 'intensive']).optional(),
-            left: z.number().optional().describe('°C, 15.5 to 30'),
+            left: z.number().optional().describe('°C, 15.5 to 30 in half degrees; the screen writes LO below 16, HI above 29.5, else "22.0 °C" (firmware format)'),
             right: z.number().optional(),
+            fahrenheit: z.boolean().optional().describe('The car sends °F: the screen writes whole degrees, "72 °F" (LO below 60, HI above 87)'),
+            styleUnknown: z
+              .boolean()
+              .optional()
+              .describe('The car sends no style state: each zone\'s vents blue up to 22.0 °C (72 °F), red above (firmware), instead of air'),
             air: z.enum(['cold', 'neutral', 'warm']).optional().describe('The vents\' colour: cold = cooling (blue), neutral = venting (white), warm = heating (red)'),
             autoDistribution: z.boolean().optional().describe('Automatic air distribution: the vents in the paler colour of their pair'),
           })
