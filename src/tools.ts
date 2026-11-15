@@ -387,7 +387,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'set_parking_preview',
     {
       title: 'Parking preview',
-      description: 'What the car reports on the parking page (nothing is written): layout, 360° side sensors, rear traffic alert, trailer, obstacles per sensor, faults per group, guide lines and steering, the area view side, the warning bar text and the screen buttons (Mute, Auto brake, camera, the pop-up\'s side panel). The buttons Mute, Auto brake and the pop-up\'s touch bar can also be pressed (list_controls, press).',
+      description: 'What the car reports on the parking page (nothing is written): layout, 360° side sensors, rear traffic alert, trailer, obstacles per sensor, faults per group, guide lines and steering, the area view side and its title (displayView), the warning bar text and the screen buttons (Mute, Auto brake, camera, the pop-up\'s side panel). The area view is drawn in the unit\'s bird\'s-eye screen (view Pmca_9E87: Mute / Auto brake, the right bar with Close and display settings, the warning bar; the mode list isn\'t drawn). The buttons Mute, Auto brake and the pop-up\'s touch bar can also be pressed (list_controls, press).',
       inputSchema: {
         layout: z.enum(['mini', 'full', 'rear', 'area']).optional().describe('mini: pop-up (with camera), full: full screen, rear: rear sensors only, area: area view'),
         show360: z.boolean().optional(),
@@ -402,6 +402,8 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         steer: z.number().min(-100).max(100).optional(),
         activeSide: z.string().optional().describe('Area view: none or a side name'),
         ground: z.boolean().optional(),
+        displayView: z.number().int().min(0).max(5).optional().describe("Area view: what the car shows (STATE.CAR_PARKING.DisplayView), which sets the title: 0 bird's-eye (no title), 1 Rear, 2 Front, 3 a side (displayMode), 4 no title, 5 Additional camera (Back instead of Cancel)"),
+        displayMode: z.union([z.literal(5), z.literal(6), z.literal(7)]).optional().describe('Area view with displayView 3: 5 Left side, 6 Right side, 7 Both sides'),
         clear: z.boolean().optional().describe('Remove obstacles, faults and alerts first'),
         disclaimer: z.number().int().min(0).max(4).optional().describe('Warning bar text (full screen and pop-up): 0 Look! Safe to move?, 1 clean sensors, 2 function restricted, 3 ParkPilot deactivated, 4 boot open'),
         muteExists: z.boolean().optional().describe('The car has the mute function: the Mute button shows'),

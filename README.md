@@ -100,7 +100,7 @@ server; they could do no more than you can on your own computer anyway.
 | `reset_items`, `revert_file` | Put items, or a whole file, back as saved (one undo step). |
 | `copy_points` | Copy positions to the other side (mirrored) or another car (scaled to its picture). |
 | `undo`, `redo` | Step back and forward through position edits, per data file. |
-| `get_parking_data`, `move_parking`, `set_parking_preview` | The parking layout file (sectors, pieces, positions) and its preview (obstacles, faults, guide lines, the warning bar text, the Mute / Auto brake / camera buttons, the pop-up's side panel…). |
+| `get_parking_data`, `move_parking`, `set_parking_preview` | The parking layout file (sectors, pieces, positions) and its preview (obstacles, faults, guide lines, the warning bar text, the Mute / Auto brake / camera buttons, the pop-up's side panel, the area view's title by `displayView`…). |
 | `get_energy_data`, `move_energy`, `set_energy_preview` | The energy flow file (car, battery, engine, e-motor, tracks) and its situation; the animations' phase and the screen's opening (play it, or hold one moment). |
 | `get_preview`, `set_preview` | What the car reports on the interior pages (nothing is written); climate: preset, fan, temperatures (`fahrenheit` for a car in °F), air colour or `styleUnknown` (vents coloured by the set temperature), `open` (the preset / fan profile drop-down or the heater push-up over the screen). |
 | `find_vehicle_messages` | Search the unit's 453 vehicle messages. |
