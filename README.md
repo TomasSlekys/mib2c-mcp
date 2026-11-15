@@ -74,7 +74,7 @@ the site may access your local network (or this computer). The dot turns green o
 same menu's **Setup** button walks you through all of this.
 
 **After that:** nothing. The page connects by itself, within a few seconds, whenever your AI app runs this server,
-and the MCP log opens at the bottom. Open the app and your skins folder and talk to your assistant.
+and the MCP log opens at the bottom. Open the app and your skins folder (or a folder holding `skins` and `startanim`) and talk to your assistant.
 
 Why the one click: browsers only let a public website reach `127.0.0.1` after you allow it (Chrome's Local Network
 Access), and the app doesn't ask on its own, so visitors who don't use MCP never see the prompt. Chrome remembers
@@ -90,7 +90,7 @@ server; they could do no more than you can on your own computer anyway.
 | Tool | What it does |
 | --- | --- |
 | `status` | Connection state, and how to connect if the page isn't. The assistant calls this first. |
-| `get_state` | Skin, head unit, theme (and its look, e.g. VW Default), page, mode, car, side, unsaved changes, undo state. |
+| `get_state` | Skin (and what was opened: the skins folder, or a root folder with `skins/` and `startanim/` and its startup screen files), head unit, theme (and its look, e.g. VW Default), page, mode, car, side, unsaved changes, undo state. |
 | `list_cars` | The cars a page has pictures for, with names where known. |
 | `navigate` | Page or any screen (Navigation, the map screen with its traffic signs: `navigation`, old id `signs` still accepted; Vehicle menu screens, Vehicle settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), Set date, the screen-off clock, the driving profile pop-up and its settings, hybrid information and low battery messages, the control bar push-ups, Start-stop and the car's start-stop pop-ups (`startstop-details`, `startstop-notice`), the vehicle status messages list, the Menu (the MENU key's carousel or grid), Settings (the system setup's lists: `settings`, `settings:<screen>`), Soon screens…), car, side, View / Edit mode, theme, head unit UI, screen view. |
 | `list_controls`, `press`, `set_control` | The page's own controls: the head unit screen's buttons and sliders, the menu, the side panels, popups. List them (id, label, place, state), click one (by id, label or screen point), or set a slider, field or list. Save buttons, confirmations, the MCP menu, sign-in and reports are left out. |
