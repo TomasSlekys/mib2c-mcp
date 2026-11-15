@@ -875,7 +875,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
       inputSchema: {
         accent: z.string().optional().describe('The UI accent colour, hex such as #8c1eff. It is the ambient light (Background lighting) colour, as on the unit: setting it sets that colour too (cars with a colour list: the nearest one). Not for themes of a region with a fixed accent'),
         live: z.boolean().optional(),
-        handNear: z.boolean().optional().describe('The hand near the screen: the headline arrows\' boxes and the control bar labels'),
+        handNear: z.boolean().optional().describe('The hand near the screen: the headline arrows\' boxes and the control bar labels; on Ambient light also the touch area buttons (lit, and the selected one ringed, only with the hand near) and whether an open slider panel stays (with the hand away and Live on it closes after 2 s, as on the unit)'),
         devView: z.boolean().optional().describe("The app's Dev view overlay (firmware names on the screen)"),
         statusBase: z.enum(['auto', 'transp', 'car']).optional().describe('Car status: what the drawing rests on'),
       },
