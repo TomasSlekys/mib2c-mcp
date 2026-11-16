@@ -706,7 +706,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     {
       title: 'Import startup pictures',
       description:
-        'Imports a GIF (its frames) or a folder / list of picture files (sorted naturally by name: img_00.png, img_01.png… as the toolbox\'s extract script writes them) onto a startup file\'s existing pictures, in order from picture "start" (with sameSize, the default, only onto pictures of the start picture\'s size, skipping the text boxes and stickers between the frames). Each frame is fitted into its picture\'s size and stored as grey levels; the command list (timing, places, sticker parts) stays as it is. Frames with no picture left are dropped, pictures with no frame keep theirs. One undo step (undo with file "startanim/startup_N.boot"); unsaved until save. Needs a root folder with startanim open in the app.',
+        'Imports a GIF (its frames) or a folder / list of picture files (sorted naturally by name: img_00.png, img_01.png… as the toolbox\'s extract script writes them) onto a startup file\'s existing pictures, in order from picture "start" (with sameSize, the default, only onto pictures of the start picture\'s size, skipping the text boxes and stickers between the frames). Each frame is fitted into its picture\'s size and stored as grey levels; the command list (timing, places, sticker parts) stays as it is. Frames with no picture left are dropped, pictures with no frame keep theirs. "pictures" puts them onto chosen pictures in order instead. With "insertAtMs" the frames are inserted as new background steps at that moment instead (a GIF keeps its own frame timing unless gifTiming is false). One undo step (undo with file "startanim/startup_N.boot"); unsaved until save. Needs a root folder with startanim open in the app.',
       inputSchema: {
         startup: z.string().describe('The startup file, e.g. "startup_0.boot"'),
         gif: z.string().optional().describe('Path of a GIF file on this computer'),
@@ -715,15 +715,20 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         start: z.number().int().min(0).optional().describe('The first picture to replace (default 0)'),
         sameSize: z.boolean().optional().describe('Only onto pictures of the start picture\'s size (default true)'),
         fit: z.enum(['fit', 'fill', 'stretch', 'actual']).optional().describe('How a frame is placed in its picture (default fit)'),
+        pictures: z.array(z.number().int().min(0)).optional().describe('Onto these pictures, in this order (as the Pictures tab\'s "Select several"), instead of a run from "start"'),
+        insertAtMs: z.number().int().min(0).optional().describe('Instead of replacing pictures: insert the frames as new background steps (800 x 480) at this moment (ms)'),
+        gifTiming: z.boolean().optional().describe('With insertAtMs and a GIF: each new step lasts as long as its GIF frame (default true)'),
+        stepHundredths: z.number().int().min(1).max(3000).optional().describe('With insertAtMs: each new step\'s length in hundredths of a second when not the GIF\'s own (default 10)'),
+        sticker: z.number().int().min(0).optional().describe('With insertAtMs: the ending (IF STICKER value) the moment is counted in (default 0)'),
       },
     },
-    async ({ startup, gif, folder, files, start, sameSize, fit }) => {
+    async ({ startup, gif, folder, files, start, sameSize, fit, pictures, insertAtMs, gifTiming, stepHundredths, sticker }) => {
       try {
         if (gif) {
           const path = resolve(gif);
           const info = await stat(path);
           if (info.size > 64 * 1024 * 1024) return failure(`${path} is over 64 MB.`);
-          return run('import_startup', { startup, gif: (await readFile(path)).toString('base64'), fileName: basename(path), start, sameSize, fit }, 300_000);
+          return run('import_startup', { startup, gif: (await readFile(path)).toString('base64'), fileName: basename(path), start, sameSize, fit, pictures, insertAtMs, gifTiming, stepHundredths, sticker }, 300_000);
         }
         let list = files ?? [];
         if (folder) list = [...list, ...(await readdir(resolve(folder))).map((f) => join(resolve(folder), f))];
@@ -735,11 +740,32 @@ export function registerTools(server: McpServer, bridge: Bridge) {
           if (info.size > MAX_PICTURE) return failure(`${f} is over ${MAX_PICTURE / 1024 / 1024} MB.`);
           frames.push({ data: (await readFile(f)).toString('base64'), fileName: basename(f) });
         }
-        return run('import_startup', { startup, frames, start, sameSize, fit }, 300_000);
+        return run('import_startup', { startup, frames, start, sameSize, fit, pictures, insertAtMs, gifTiming, stepHundredths, sticker }, 300_000);
       } catch (e) {
         return failed(e);
       }
     },
+  );
+
+  server.registerTool(
+    'startup_text_line',
+    {
+      title: 'Make a startup text line',
+      description:
+        'Makes a text line picture for a startup file (480 x 100, white text on black, stored as grey levels: the unit\'s startup pictures have no colour) with one of the open theme\'s fonts, and either replaces a picture with it ("picture", e.g. the welcome text line) or shows it as a new text line at 160, 320 from a moment ("ms"). One undo step (undo with file "startanim/startup_N.boot"); unsaved until save. The result lists the fonts. Needs a root folder with startanim open in the app.',
+      inputSchema: {
+        startup: z.string().describe('The startup file, e.g. "startup_0.boot"'),
+        text: z.string().describe('The text ("\\n" for a second line)'),
+        font: z.string().optional().describe('A theme font by its label (e.g. "VWTextCarUI-Regular"); default the first one'),
+        size: z.number().min(8).max(100).optional().describe('Pixel size (default 44)'),
+        bold: z.boolean().optional(),
+        align: z.enum(['left', 'center', 'right']).optional().describe('Default center'),
+        picture: z.number().int().min(0).optional().describe('Replace this picture with the text line'),
+        ms: z.number().int().min(0).optional().describe('Or show it as a new text line from this moment (ms)'),
+        sticker: z.number().int().min(0).optional().describe('With ms: the ending (IF STICKER value) the moment is counted in (default 0)'),
+      },
+    },
+    async (a) => run('startup_text_line', a),
   );
 
   server.registerTool(
@@ -1094,7 +1120,7 @@ export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app ($
 - The user must open their skins folder in the app themselves (or a root folder holding skins/ and startanim/, the unit's startup screens); the browser doesn't let anything else pick it.
 - get_state says what is shown (page, screen, popups); navigate changes it (page, or any screen by id: Vehicle menu screens (the lap timer's statistics and questions too), settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), the driving profile pop-up and its settings, hybrid information and low battery messages, the control bar push-ups (Selection list, Media mini player), Start-stop and the car's start-stop pop-ups, the Menu (the MENU key's carousel or grid), Settings (the system setup's lists; its Language list sets the system language the screens follow, e.g. the Offroad compass), Soon screens); screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).\n- Vehicle pages' preview values: get_page_preview / set_page_preview. get_layers / set_layers show or hide parts. get_screen / set_screen (accent, Live off for repeatable screenshots (with set_status_line mode custom: the auto status line moves whatever Live is), hand near, Dev view), get_status_line / set_status_line (status line, car features). Presets: list_presets, try_preset. Users' reports: list_reports.\n- To get anywhere else, or change a preview setting no tool covers, use the app's own controls: list_controls (screen buttons, menu, side panels, popups), press (by id, label, or screen point) and set_control (sliders, fields, lists).
 - Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored), swap_zones (two touch areas trade outlines) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
-- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image. Startup screens (a root folder with startanim): get_image / export_image / replace_image / revert_image with startup: "startup_N.boot" and index: the picture number; import_startup brings a GIF or a folder of pictures onto a file's pictures in order (one undo step); get_startup_program reads a file's program, edit_startup changes it (commands, timing, places, IF STICKER endings, pictures; one undo step), new_startup makes a new file (or a copy); undo / redo with file "startanim/startup_N.boot".
+- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image. Startup screens (a root folder with startanim): get_image / export_image / replace_image / revert_image with startup: "startup_N.boot" and index: the picture number; import_startup brings a GIF or a folder of pictures onto a file's pictures in order, onto chosen ones ("pictures"), or inserts them as new steps ("insertAtMs", with the GIF's own timing) (one undo step); startup_text_line makes a 480 x 100 text line in a theme font; get_startup_program reads a file's program, edit_startup changes it (commands, timing, places, IF STICKER endings, pictures; one undo step), new_startup makes a new file (or a copy); undo / redo with file "startanim/startup_N.boot".
 - Preview settings (set_preview, set_parking_preview, set_energy_preview: also the energy flow's animation phase and its opening, played or held at a moment) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it. Save to SD card (the toolbox and the saved edits onto the card for the car) is the user's own: get_card_plan reads what it would write.
 - Firmware / reverse engineering questions about a screen (read-only, with or without the app's Dev view switch): get_dev_info (view name, class, model name, view id, state machine states, button events, the widgets that send them and where they lead, datapool values read), list_screen_items, find_item_at (x, y on the screen), list_strings; across all screens: find_view, find_string, find_image_usage. Facts come from the MIB2 Standard firmware; runtime texts and content areas are the app's own and are marked so.
 - The user sees everything you do in the app's MCP log.
