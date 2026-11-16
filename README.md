@@ -121,6 +121,7 @@ server; they could do no more than you can on your own computer anyway.
 | `swap_images` | Two images trade pictures; on the page that draws them their places (zone file points, parking and energy flow positions) trade too, so the screen looks the same, unless `keepPlaces`. Unsaved until save. |
 | `swap_zones` | Two touch areas of the shown zone file trade outlines (places and shapes); each keeps its button id. One undo step. |
 | `get_changes`, `check_skin` | Everything save would write, before and after; a check of the edited zone files. |
+| `get_card_plan` | Read only: what Save to SD card would put on the card (edited files, the card's state, toolbox versions). Picking the card and writing it stay with the user. |
 | `save` | Save every change; you confirm in the app first, unless you let MCP save without asking. |
 
 Everything the assistant does shows up in the app's **MCP › Log**: each action with its time, a plain description,
