@@ -25,6 +25,10 @@ const imageRef = {
   theme: z.boolean().optional().describe('An image of the open theme skin (skin1…): the Vehicle screens\' dials, buttons, backgrounds and other UI pictures'),
   viewImage: z.number().int().optional().describe('With theme: the view image id (list_screen_items, find_image_usage), instead of index'),
   night: z.boolean().optional().describe('With viewImage: its night bitmap'),
+  startup: z
+    .string()
+    .optional()
+    .describe('A startup screen file of the open root folder\'s startanim (e.g. "startup_0.boot"): then index is the picture number in that file. Startup pictures are grey levels on black'),
 };
 const placement = z
   .object({
@@ -340,7 +344,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'get_changes',
     {
       title: 'Unsaved changes',
-      description: 'Everything that save would write: each replaced image (with the file it came from) and every moved point, touch area, parking or energy flow position, with its saved and new place.',
+      description: 'Everything that save would write: each replaced image (with the file it came from), every moved point, touch area, parking or energy flow position, with its saved and new place, and the startup files (startanim/startup_N.boot) with replaced pictures.',
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -351,7 +355,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'check_skin',
     {
       title: 'Check before saving',
-      description: "Checks the edited zone files (and the one shown): whether the head unit loads each file, and points or touch areas that reach outside their picture or are too small to press. Errors would break the screen on the unit; warnings are worth a look.",
+      description: "Checks the edited zone files (and the one shown): whether the head unit loads each file, and points or touch areas that reach outside their picture or are too small to press. Edited startup files are written as save would write them and read back: same command list and picture count, every picture decodes; a changed picture size or a file outside half to double its size is a warning. Errors would break the screen on the unit; warnings are worth a look.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -476,7 +480,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
       dir,
       {
         title: dir === 'undo' ? 'Undo' : 'Redo',
-        description: `${dir === 'undo' ? 'Undoes' : 'Redoes'} one position edit: in the zone file shown, or in the data file named (a path from get_state's unsaved files: .gca, carstatus.car, parking .ops, energy flow .efl).`,
+        description: `${dir === 'undo' ? 'Undoes' : 'Redoes'} one position edit: in the zone file shown, or in the data file named (a path from get_state's unsaved files: .gca, carstatus.car, parking .ops, energy flow .efl), or one picture change in a startup file ("startanim/startup_0.boot").`,
         inputSchema: { file: z.string().optional() },
       },
       (a) => run(dir, a),
@@ -666,7 +670,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     {
       title: 'Replace image',
       description:
-        'Replaces one image of the skin with a picture file on this computer (PNG, JPEG or WebP), stored in the image\'s format. It must have the image\'s size (only ambient feature images may change size) unless fit is "fit", "fill" or "stretch". A shared image changes everywhere it is used. Unsaved until save; revert_image takes it back.',
+        'Replaces one image of the skin with a picture file on this computer (PNG, JPEG or WebP), stored in the image\'s format. It must have the image\'s size (only ambient feature images may change size) unless fit is "fit", "fill" or "stretch". A shared image changes everywhere it is used. With startup: a picture of a startup file (stored as grey levels; fit "actual" may change its size, which check_skin warns about). Unsaved until save; revert_image takes it back.',
       inputSchema: {
         ...imageRef,
         file: z.string().describe('Path of the picture file on this computer'),
@@ -980,7 +984,7 @@ export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app ($
 - The user must open their skins folder in the app themselves (or a root folder holding skins/ and startanim/, the unit's startup screens); the browser doesn't let anything else pick it.
 - get_state says what is shown (page, screen, popups); navigate changes it (page, or any screen by id: Vehicle menu screens (the lap timer's statistics and questions too), settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), the driving profile pop-up and its settings, hybrid information and low battery messages, the control bar push-ups (Selection list, Media mini player), Start-stop and the car's start-stop pop-ups, the Menu (the MENU key's carousel or grid), Settings (the system setup's lists; its Language list sets the system language the screens follow, e.g. the Offroad compass), Soon screens); screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).\n- Vehicle pages' preview values: get_page_preview / set_page_preview. get_layers / set_layers show or hide parts. get_screen / set_screen (accent, Live off for repeatable screenshots (with set_status_line mode custom: the auto status line moves whatever Live is), hand near, Dev view), get_status_line / set_status_line (status line, car features). Presets: list_presets, try_preset. Users' reports: list_reports.\n- To get anywhere else, or change a preview setting no tool covers, use the app's own controls: list_controls (screen buttons, menu, side panels, popups), press (by id, label, or screen point) and set_control (sliders, fields, lists).
 - Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored), swap_zones (two touch areas trade outlines) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
-- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image.
+- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image. Startup screens (a root folder with startanim): get_image / export_image / replace_image / revert_image with startup: "startup_N.boot" and index: the picture number; undo / redo with file "startanim/startup_N.boot".
 - Preview settings (set_preview, set_parking_preview, set_energy_preview: also the energy flow's animation phase and its opening, played or held at a moment) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
 - Firmware / reverse engineering questions about a screen (read-only, with or without the app's Dev view switch): get_dev_info (view name, class, model name, view id, state machine states, button events, the widgets that send them and where they lead, datapool values read), list_screen_items, find_item_at (x, y on the screen), list_strings; across all screens: find_view, find_string, find_image_usage. Facts come from the MIB2 Standard firmware; runtime texts and content areas are the app's own and are marked so.
 - The user sees everything you do in the app's MCP log.
