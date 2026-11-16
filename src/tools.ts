@@ -408,7 +408,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         clear: z.boolean().optional().describe('Remove obstacles, faults and alerts first'),
         disclaimer: z.number().int().min(0).max(4).optional().describe('Warning bar text (full screen and pop-up): 0 Look! Safe to move?, 1 clean sensors, 2 function restricted, 3 ParkPilot deactivated, 4 boot open'),
         muteExists: z.boolean().optional().describe('The car has the mute function: the Mute button shows'),
-        muteAvailable: z.boolean().optional().describe('Mute enabled (dimmed when false, as on the unit screenshots)'),
+        muteAvailable: z.boolean().optional().describe('Mute enabled (default true; false dims it, as on the unit screenshots)'),
         muteOn: z.boolean().optional().describe('Parking sounds muted: Mute lit amber'),
         autoBrakeAvailable: z.boolean().optional().describe('Auto brake enabled (whether it shows is the autoBrake car feature, set_screen)'),
         manoeuvreAssist: z.boolean().optional().describe('Manoeuvre braking on; the unit lights the Auto brake button while it is off'),
