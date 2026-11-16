@@ -12,6 +12,8 @@ confirm (unless you let it save without asking). Everything it does shows up in 
 Your skin files stay in the browser. This server runs on your computer, listens only on `127.0.0.1`, and talks to
 the page over a WebSocket. There is nothing to pair or type in.
 
+
+> ⚠ Changed skin or startup files might brick the head unit (startup files especially: they run before its screen starts). The INSTRUCTIONS tell the assistant to mention this before suggesting the user saves, writes the SD card or installs changed files; `get_startup_program` / `get_startup_steps` carry a short `warning`.
 ## Requirements
 
 - Node.js 20 or newer, and git (npx fetches the server from GitHub).
