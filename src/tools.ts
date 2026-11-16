@@ -388,7 +388,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'set_parking_preview',
     {
       title: 'Parking preview',
-      description: 'What the car reports on the parking page (nothing is written): layout, 360° side sensors, rear traffic alert, trailer, obstacles per sensor, faults per group, guide lines and steering, the area view side and its title (displayView), the warning bar text and the screen buttons (Mute, Auto brake, camera, the pop-up\'s side panel). The area view is drawn in the unit\'s bird\'s-eye screen (view Pmca_9E87: Mute / Auto brake, the right bar with Close and display settings, the warning bar; the mode list isn\'t drawn). The buttons Mute, Auto brake and the pop-up\'s touch bar can also be pressed (list_controls, press).',
+      description: 'What the car reports on the parking page (nothing is written): layout, 360° side sensors, rear traffic alert, trailer, obstacles per sensor, faults per group, guide lines and steering, the area view side and its title (displayView), the warning bar text and the screen buttons (Mute, Auto brake, camera, the pop-up\'s side panel). The area view is drawn in the unit\'s bird\'s-eye screen (view Pmca_9E87: Mute / Auto brake, the right bar with Close and display settings, the warning bar); with a camera view (displayView 1, 2, 3, 5) its split variant: the small parking panel on the left with the shown side lit, Mute, Auto brake, the touch bar and the external camera button. The mode list isn\'t drawn. The buttons Mute, Auto brake and the pop-up\'s touch bar can also be pressed (list_controls, press).',
       inputSchema: {
         layout: z.enum(['mini', 'full', 'rear', 'area']).optional().describe('mini: pop-up (with camera), full: full screen, rear: rear sensors only, area: area view'),
         show360: z.boolean().optional(),
@@ -416,6 +416,8 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         rvcAvailable: z.boolean().optional().describe('Full screen: the camera button is enabled'),
         panelOpen: z.boolean().optional().describe('Pop-up: the left panel with the sensors open, or folded to its buttons (the touch bar on the screen toggles it; press it with press)'),
         opsAvailable: z.boolean().optional().describe('Pop-up: sensors available (without them the panel stays folded and the touch bar is disabled)'),
+        extCamExists: z.boolean().optional().describe('Area view split variant: the car has the external camera function, so its button shows'),
+        extCamAvailable: z.boolean().optional().describe('Area view split variant: the external camera function is available (its button enabled, dimmed when not)'),
       },
     },
     (a) => run('set_parking_preview', a),
