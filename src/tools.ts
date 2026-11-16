@@ -899,7 +899,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     'get_status_line',
     {
       title: 'Status line and car features',
-      description: "The status line every screen shows (clock, temperature, online, network, audio, phone…: the unit photo's set or set by hand), °F and 12 h, and the car features (parts only some cars show) with their choices.",
+      description: "The status line every screen shows (clock, temperature, online, network, audio, phone…: the unit photo's set or set by hand), °F and 12 h, the audio source playing (the control bar's Media button), and the car features (parts only some cars show) with their choices.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -916,6 +916,7 @@ export function registerTools(server: McpServer, bridge: Bridge) {
         custom: z.record(z.string(), z.unknown()).optional().describe('Status line parts, as get_status_line lists them'),
         fahrenheit: z.boolean().optional(),
         hour12: z.boolean().optional(),
+        audio: z.enum(['media', 'nosource', 'fm', 'dab']).optional().describe("The audio source playing (the car's current audio component): media / nosource make the control bar's Media button show Media and its note icon, fm / dab show Radio and the radio icon, as the unit does; also the Media mini player's content. Not remembered"),
         features: z.record(z.string(), z.number().int().min(0).nullable()).optional(),
       },
     },
