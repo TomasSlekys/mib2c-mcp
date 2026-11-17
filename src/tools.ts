@@ -798,6 +798,40 @@ export function registerTools(server: McpServer, bridge: Bridge) {
     .passthrough();
 
   server.registerTool(
+    'import_startup_files',
+    {
+      title: 'Import startup files',
+      description:
+        'Imports whole startup_N.boot files from this computer (another SW package\'s startanim, another user\'s, a backup) into the startanim of the root folder open in the app. Each is checked (SCRT header, structure, pictures, size; a broken one is refused with the reason), skipped when byte-identical to one already there, and goes to its own number when free, else the next free one; "number" picks another, and an existing number needs replace: true (the replaced file keeps a .backup when saved). The header\'s number is set to the target number. Unsaved until save; undo with file "startanim/startup_N.boot". Changed startup files might brick the unit (they run before its screen starts): before suggesting the user installs one, tell them about that risk.',
+      inputSchema: {
+        files: z
+          .array(
+            z.object({
+              path: z.string().describe('A .boot file on this computer'),
+              number: z.number().int().min(0).max(999).optional().describe('Import it as startup_N.boot (default: its own number if free, else the next free one)'),
+              replace: z.boolean().optional().describe('Replace an existing startup_N.boot'),
+            }),
+          )
+          .min(1),
+      },
+    },
+    async ({ files }) => {
+      try {
+        const sent = [];
+        for (const f of files) {
+          const path = resolve(f.path);
+          const info = await stat(path);
+          if (info.size > 64 * 1024 * 1024) throw new Error(`${path} is over 64 MB.`);
+          sent.push({ data: (await readFile(path)).toString('base64'), fileName: basename(path), number: f.number, replace: f.replace });
+        }
+        return run('import_startup_files', { files: sent }, 120_000);
+      } catch (e) {
+        return failed(e);
+      }
+    },
+  );
+
+  server.registerTool(
     'get_startup_steps',
     {
       title: 'Read a startup file as steps',
@@ -1175,7 +1209,7 @@ export const INSTRUCTIONS = `This server drives the MIB2 Configurator web app ($
 - The user must open their skins folder in the app themselves (or a root folder holding skins/ and startanim/, the unit's startup screens); the browser doesn't let anything else pick it.
 - get_state says what is shown (page, screen, popups); navigate changes it (page, or any screen by id: Vehicle menu screens (the lap timer's statistics and questions too), settings, Pure Air, the auxiliary heater and its timer screens, Set time (the clock), the driving profile pop-up and its settings, hybrid information and low battery messages, the control bar push-ups (Selection list, Media mini player), Start-stop and the car's start-stop pop-ups, the Menu (the MENU key's carousel or grid), Settings (the system setup's lists; its Language list sets the system language the screens follow, e.g. the Offroad compass), Soon screens); screenshot shows it (labels: true names every point and touch area; region + zoom for a close look).\n- Vehicle pages' preview values: get_page_preview / set_page_preview. get_layers / set_layers show or hide parts. get_screen / set_screen (accent, Live off for repeatable screenshots (with set_status_line mode custom: the auto status line moves whatever Live is), hand near, Dev view), get_status_line / set_status_line (status line, car features). Presets: list_presets, try_preset. Users' reports: list_reports.\n- To get anywhere else, or change a preview setting no tool covers, use the app's own controls: list_controls (screen buttons, menu, side panels, popups), press (by id, label, or screen point) and set_control (sliders, fields, lists).
 - Ambient light, climate, car status: get_scene_data lists the zone file; move_items, set_points, align_items, distribute_items, reset_items, copy_points (to the other side or car, mirrored), swap_zones (two touch areas trade outlines) edit it. Parking and energy flow: get_parking_data / move_parking, get_energy_data / move_energy. undo / redo / revert_file step back.
-- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image. Startup screens (a root folder with startanim): get_image / export_image / replace_image / revert_image with startup: "startup_N.boot" and index: the picture number; import_startup brings a GIF or a folder of pictures onto a file's pictures in order, onto chosen ones ("pictures"), or inserts them as new steps ("insertAtMs", with the GIF's own timing) (one undo step); startup_text_line makes a 480 x 100 text line in a theme font; get_startup_steps / edit_startup_steps read and edit a file as steps (a background, its bottom text or picture (edit_startup_steps bottom, from a file) and a time; the ending and the second, Dynaudio ending: the Startup page's Simple view, preview field startupMode): use them for simple files; get_startup_program reads a file's program (fitsSteps says whether it reads as steps) and edit_startup changes it (commands, timing, places, IF STICKER endings, pictures; one undo step): use them for advanced files (IF / ELSE beyond the two endings, pictures that stay across steps, markers, exact replicas of a factory file); new_startup makes a new file (or a copy); undo / redo with file "startanim/startup_N.boot".
+- Images (theme: true for the theme skin's UI bitmaps, by index or viewImage): list_images, export_image (to a PNG file to edit elsewhere), replace_image / replace_images (from files), swap_images (two images trade pictures, and their places on the shown page unless keepPlaces), revert_image. Startup screens (a root folder with startanim): get_image / export_image / replace_image / revert_image with startup: "startup_N.boot" and index: the picture number; import_startup brings a GIF or a folder of pictures onto a file's pictures in order, onto chosen ones ("pictures"), or inserts them as new steps ("insertAtMs", with the GIF's own timing) (one undo step); startup_text_line makes a 480 x 100 text line in a theme font; get_startup_steps / edit_startup_steps read and edit a file as steps (a background, its bottom text or picture (edit_startup_steps bottom, from a file) and a time; the ending and the second, Dynaudio ending: the Startup page's Simple view, preview field startupMode): use them for simple files; get_startup_program reads a file's program (fitsSteps says whether it reads as steps) and edit_startup changes it (commands, timing, places, IF STICKER endings, pictures; one undo step): use them for advanced files (IF / ELSE beyond the two endings, pictures that stay across steps, markers, exact replicas of a factory file); new_startup makes a new file (or a copy); import_startup_files brings whole startup_N.boot files from this computer in (checked, to a free number or replacing one); undo / redo with file "startanim/startup_N.boot".
 - Preview settings (set_preview, set_parking_preview, set_energy_preview: also the energy flow's animation phase and its opening, played or held at a moment) only change what is drawn. Edits stay unsaved until save; get_changes lists them and check_skin checks them. Don't save unless the user asked for it.
 - Firmware / reverse engineering questions about a screen (read-only, with or without the app's Dev view switch): get_dev_info (view name, class, model name, view id, state machine states, button events, the widgets that send them and where they lead, datapool values read), list_screen_items, find_item_at (x, y on the screen), list_strings; across all screens: find_view, find_string, find_image_usage. Facts come from the MIB2 Standard firmware; runtime texts and content areas are the app's own and are marked so.
 - The user sees everything you do in the app's MCP log.
